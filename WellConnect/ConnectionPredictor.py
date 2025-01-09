@@ -1,4 +1,4 @@
-from WellConnect.homophily_functions import HOMOPHILY_FUNCTIONS
+from homophily_functions import HOMOPHILY_FUNCTIONS
 
 class ConnectionPredictor:
     def __init__(self, weights, max_distances, homophily_function_name = 'linear'):
