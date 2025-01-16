@@ -1,12 +1,3 @@
-def linear_homophily_function():
-    pass
-
-#Functoin registry
-HOMOPHILY_FUNCTIONS = {
-    "linear": linear_homophily_function,
-}
-
-
 def linear_homophily_function(node1, node2, G, weights, max_distances): #TODO: incorporate euclidean distance?
     """
     Calculates the homophily score (e.g., tie strength between two individuals based on their trait compatibility).
@@ -48,3 +39,9 @@ def linear_homophily_function(node1, node2, G, weights, max_distances): #TODO: i
     score = 1 - (normalized_total_distance / max_normalized_total_distance)
     return round(score, 2)
     pass
+
+
+#Function registry
+HOMOPHILY_FUNCTIONS = {
+    "linear": linear_homophily_function,
+}

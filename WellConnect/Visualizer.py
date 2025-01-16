@@ -1,8 +1,8 @@
 import networkx as nx
 import pandas as pd
 
-class Visualizer:
-    def __init__(self):
+class Visualizer: #TODO: adjust this to communicate with a data file where the graph graphs/data are
+    def __init__(self): 
         """Initialize the Visualizer"""
 
     def show_network(self, G, layout="circular"):

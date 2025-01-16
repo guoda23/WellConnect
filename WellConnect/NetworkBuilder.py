@@ -11,7 +11,8 @@ class NetworkBuilder:
         """
 
         self.group_data = group_data
-        self.group_size = group_size
+        self.group_size = group_size #TODO: infer?
+
 
     def create_group_graphs(self):
         """

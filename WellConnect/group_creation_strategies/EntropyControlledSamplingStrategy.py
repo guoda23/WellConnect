@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import entropy
-from group_creation.GroupCreationStrategy import GroupCreationStrategy
+from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
 class EntropyControlledSamplingStrategy(GroupCreationStrategy): 
     def __init__(self, population_data, group_size, target_entropy, trait, tolerance, num_groups=None, seed=None):
@@ -35,7 +35,7 @@ class EntropyControlledSamplingStrategy(GroupCreationStrategy):
             current_entropy = 0.0
 
             while len(group_members) < self.group_size:
-                if group_members: #calculate entropy if there are members in the group
+                if group_members:
                     group_trait_values = [row[self.trait] for row in group_members]
                     current_entropy = self.calculate_entropy(group_trait_values)
             
@@ -44,7 +44,7 @@ class EntropyControlledSamplingStrategy(GroupCreationStrategy):
                     break
 
                 # Candidate selection
-                candidate = self.select_best_candidate(available_data, group_members, self.trait)
+                candidate = self.select_best_candidate(available_data, group_members)
 
                 if candidate is not None:
                     group_members.append(candidate)
@@ -72,6 +72,7 @@ class EntropyControlledSamplingStrategy(GroupCreationStrategy):
         value_counts = pd.Series(trait_values).value_counts(normalize=True)
         return entropy(value_counts, base=2) #Shannon entropy with base 2 log
     
+
     def should_stop_group_formation(self, group_members, current_entropy):
         """
         Checks if group formation should stop based on entropy and group size.
@@ -87,6 +88,7 @@ class EntropyControlledSamplingStrategy(GroupCreationStrategy):
             len(group_members) == self.group_size
             and abs(current_entropy - self.target_entropy) <= self.tolerance
         )
+    
     
     def select_best_candidate(self, available_data, group_members):
         """

@@ -7,6 +7,7 @@ class RegressionRunner:
         self.attributes = attributes
         self.max_distances = max_distances
 
+
     def prepare_group_regression_data(self, G):
         """
         Prepares data for regression analysis by calculating distances between node attributes.
@@ -75,7 +76,6 @@ class RegressionRunner:
         recovered_weights_df = pd.DataFrame(recovered_weights_by_group)
         return recovered_weights_df
     
-
 
     def display_results(self, recovered_weights_df, true_weights=None):
         """

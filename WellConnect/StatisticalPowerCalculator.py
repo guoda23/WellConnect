@@ -23,6 +23,7 @@ class StatisticalPowerCalculator:
         self.n_bootstraps = n_bootstraps
         self.confidence_level = confidence_level
 
+
     def bootstrap_confidence_interval(self, data):
         """
         Computes the bootstrap confidence interval for the given data.
@@ -88,7 +89,7 @@ class StatisticalPowerCalculator:
         return np.mean((bootstrap_means - true_value) ** 2)
 
 
-    def evaluate_predictive_power(self, attribute):
+    def evaluate_predictive_power(self, attribute): #TODO: polish this for thesis goals. Attribute?
         """
         Evaluates predictive power for a specific attribute.
 
@@ -109,7 +110,7 @@ class StatisticalPowerCalculator:
         bias = self.calculate_bias(data, true_value)
         mse = self.calculate_mse(data, true_value)
 
-        return {
+        return {                        #TODO:display vs return?
             "attribute": attribute,
             "true_value": true_value,
             "coverage_probability": coverage,

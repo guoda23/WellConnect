@@ -1,4 +1,4 @@
-from group_creation.GroupCreationStrategy import GroupCreationStrategy
+from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
 
 class GroupCreator:
@@ -23,5 +23,8 @@ class GroupCreator:
         - pd.DataFrame: A DataFrame with group assignments and associated attributes.
         """
         return self.strategy.create_groups()
+    
+
+
         
 

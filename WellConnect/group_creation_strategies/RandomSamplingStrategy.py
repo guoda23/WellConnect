@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from group_creation.GroupCreationStrategy import GroupCreationStrategy
+from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
 class RandomSamplingStrategy(GroupCreationStrategy):
     """

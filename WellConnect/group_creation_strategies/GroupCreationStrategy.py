@@ -32,6 +32,7 @@ class GroupCreationStrategy(ABC):
 
         self.validate_group_size_for_population() # Check if large enough population for number of groups
 
+
     def validate_group_size_for_population(self):
         """
         Validates that the group size and number of groups fit within the population size.
@@ -43,6 +44,7 @@ class GroupCreationStrategy(ABC):
         if self.group_size * self.num_groups > len(self.population_data):
             raise ValueError("Not enough data to create the specified number of groups.")
         
+
     @abstractmethod 
     def create_groups(self, **kwargs):
         """
@@ -55,6 +57,7 @@ class GroupCreationStrategy(ABC):
         - pd.DataFrame: A DataFrame with group assignments and associated attributes.
         """
         pass
+
 
     def group_list_to_df(self, groups):
         """
