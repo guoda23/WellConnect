@@ -1,7 +1,6 @@
 from DataHandler import DataHandler
 from GroupCreator import GroupCreator
 from group_creation_strategies import RandomSamplingStrategy, TraitBasedStrategy, EntropyControlledSamplingStrategy
-from NetworkBuilder import NetworkBuilder
 from ConnectionPredictor import ConnectionPredictor
 from RegressionRunner import RegressionRunner
 from StatisticalPowerCalculator import StatisticalPowerCalculator
@@ -15,11 +14,12 @@ class WellConnectController:
         self.attributes = attributes #TODO: automate this
         self.max_distances = max_distances #TODO" automate this
         self.weights = weights 
+        self.agents = self.data_handler.create_agents(self.population_data, self.attributes)
 
-        #modules instantiated later
+
+        #some modules instantiated later
         self.group_creator = None 
-        self.network_builder = None
-        self.connection_predictor = None
+        self.connection_predictor = ConnectionPredictor(weights=self.weights, max_distances=self.max_distances)
         self.regression_runner = None
         self.statistical_power_calculator = None
 
@@ -33,50 +33,42 @@ class WellConnectController:
         """Set the group creation strategy with shared and specific arguments."""
         if strategy == "random":
             self.group_creator = GroupCreator(
-                RandomSamplingStrategy(self.population_data, self.group_size, **kwargs)
+                RandomSamplingStrategy(self.agents, self.group_size, **kwargs)
             )
-        elif strategy == "trait_based":
+        elif strategy == "trait-based":
             self.group_creator = GroupCreator(
-                TraitBasedStrategy(self.population_data, self.group_size, **kwargs)
+                TraitBasedStrategy(self.agents, self.group_size, **kwargs)
             )
-        elif strategy == "entropy_controlled":
+        elif strategy == "entropy-controlled":
             self.group_creator = GroupCreator(
-                EntropyControlledSamplingStrategy(self.population_data, self.group_size, **kwargs)
+                EntropyControlledSamplingStrategy(self.agents, self.group_size, **kwargs)
             )
         else:
             raise ValueError("Unknown strategy: Choose 'random', 'trait_based', or 'entropy_controlled'")
+        
 
-
-    def run(self, strategy, mode = 'syntehtic_data', **kwargs):
-        #test the data loading
-        self.display_population_data()
+    def run(self, strategy, **kwargs):
+        self.display_population_data() #test the data loading
 
         #create groups
         self.set_group_creation_strategy(strategy, **kwargs)
-        groups = self.group_creator.create_groups() #TODO: dump groups into an storage file
-        print("Created Groups:", groups)
+        groups = self.group_creator.create_groups()
+        # print("Created Groups:", groups)
 
-        #create group graphs
-        self.network_builder = NetworkBuilder(group_data=groups, group_size=self.group_size)
-        group_graphs = self.network_builder.create_group_graphs() #Dump this into a storage file
+        for group in groups:
+            group.create_group_graph() #create group graphs
 
-        #run the social connection predictions (update graphs with weights)
-        self.connection_predictor = ConnectionPredictor(weights=self.weights, max_distances=self.max_distances)
-        group_graphs = self.connection_predictor.predict_weights(group_graph_dict=group_graphs)
+            #run the social connection predictions (update graphs with weights)
+            self.connection_predictor.predict_weights(group.network)
+
 
         #run linear regression
         self.regression_runner = RegressionRunner(attributes=self.attributes, max_distances=self.max_distances)
-        recovered_weights_df = self.regression_runner.perform_group_regression(group_graphs=group_graphs)
-
-        if mode == 'syntehtic_data':
-            self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=self.weights)
-        elif mode == 'real_data':
-            self.regression_runner.display_results(recovered_weights_df=recovered_weights_df)
-        else:
-            raise ValueError("Unknown mode: Choose 'syntehtic_data' or 'real_data'")
-
-        return groups, group_graphs, recovered_weights_df
+        recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups)
+        self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=self.weights)
         
+        return groups, recovered_weights_df  #TODO: put into an storage file -> save_experiment_data()
+
 
     def statistical_power_analysis(self, trait_of_interest, recovered_weights_df):
         self.statistical_power_calculator = StatisticalPowerCalculator(recovered_weights_df=recovered_weights_df, true_weights=self.weights)
@@ -85,4 +77,5 @@ class WellConnectController:
     
 
     def save_experiment_data(self):
+        #save params, groups, recovered_weights_df, measure_dict
         pass

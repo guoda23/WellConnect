@@ -110,11 +110,12 @@ class StatisticalPowerCalculator:
         bias = self.calculate_bias(data, true_value)
         mse = self.calculate_mse(data, true_value)
 
-        return {                        #TODO:display vs return?
+        return {
             "attribute": attribute,
-            "true_value": true_value,
-            "coverage_probability": coverage,
-            "bias": bias,
-            "mse": mse,
-            "confidence_interval": (lower_bound, upper_bound),
+            "true_value": round(true_value, 3) if isinstance(true_value, (int, float)) else true_value,
+            "coverage_probability": round(coverage, 3),
+            "bias": round(bias, 3),
+            "mse": round(mse, 3),
+            "confidence_interval": (round(lower_bound, 3), round(upper_bound, 3)),
         }
+

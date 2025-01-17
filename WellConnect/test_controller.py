@@ -16,11 +16,9 @@ ATTRIBUTES = ['age', 'education', 'gender']
 SEED = 123
 GROUP_SIZE = 10
 NUM_GROUPS = 10
-GROUP_FORMATION = 'entropy-based' #'random' #'biased'
-TRAIT_BIAS = 'age+edu+gender' #'age+edu' #'age' # #
-TOLERANCE = 0.01
-TARGET_ENTROPY = 1.0
-ENTROPY_TOL = 0.05
+GROUP_FORMATION = 'entropy-controlled'
+TARGET_ENTROPY = 0.3
+ENTROPY_TOL = 0
 TRAIT_OF_INTEREST = 'gender'
 
 
@@ -30,7 +28,7 @@ controller = WellConnectController(data_path='binary_age_gender_edu.csv',
                                    max_distances=MAX_DISTANCES,
                                    weights=BASE_WEIGHTS)
 
-groups, group_graphs, recovered_weights_df = controller.run("entropy_controlled", target_entropy = TARGET_ENTROPY,
+groups, recovered_weights_df = controller.run(strategy=GROUP_FORMATION, target_entropy = TARGET_ENTROPY,
                tolerance = ENTROPY_TOL,
                trait = TRAIT_OF_INTEREST,
                seed = SEED,

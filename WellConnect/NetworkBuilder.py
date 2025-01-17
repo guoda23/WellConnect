@@ -1,17 +1,16 @@
 import networkx as nx
 
-class NetworkBuilder:
-    def __init__(self, group_data, group_size):
+class NetworkBuilder: #TODO: remove class (now integrated in Group class)
+    def __init__(self, groups):
         """
         Initializes the NetworkBuilder.
 
         Parameters:
-        - group_data (pd.DataFrame): DataFrame with `group_id` and individual attributes.
+        - groups (list[Group]): List of Group objects.
         - group_size (int): Number of individuals per group.
         """
 
-        self.group_data = group_data
-        self.group_size = group_size #TODO: infer?
+        self.groups = groups
 
 
     def create_group_graphs(self):
@@ -24,19 +23,18 @@ class NetworkBuilder:
 
         group_graphs = {}
 
-        for group_id, group_data in self.group_data.groupby('group_id'):
-            person_ids = group_data.index.tolist()
-            G = nx.complete_graph(self.group_size)
+        for group in self.groups:
+            G = nx.complete_graph(group.group_size)
 
             # Relabel nodes with person IDs
-            mapping = {i: person_ids[i] for i in range(self.group_size)}
+            mapping = {i: agent.agent_id for i, agent in enumerate(group.members)}
             G = nx.relabel_nodes(G, mapping)
 
             # Assign node attributes
-            for person_id, row in group_data.iterrows():
-                G.nodes[person_id].update(row.to_dict())
+            for agent in group.members:
+                G.nodes[agent.agent_id].update(agent.__dict__)
 
-            group_graphs[group_id] = G
+            group_graphs[group.group_id] = G
 
         return group_graphs
 

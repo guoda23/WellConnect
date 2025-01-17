@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
-class TraitBasedStrategy(GroupCreationStrategy):
+class TraitBasedStrategy(GroupCreationStrategy): #TODO:redo according to agent/ group classes
     def __init__(self, population_data, group_size, trait, secondary_trait=None, num_groups=None, seed=None):
         super().__init__(population_data, group_size, num_groups, seed) #inherit from parent class
         self.trait = trait

@@ -8,25 +8,26 @@ class RegressionRunner:
         self.max_distances = max_distances
 
 
-    def prepare_group_regression_data(self, G):
+    def prepare_group_regression_data(self, group):
         """
         Prepares data for regression analysis by calculating distances between node attributes.
 
         Parameters:
-            G (networkx.Graph): The graph containing nodes and edges.
+            group (Group): The group containing the network to analyze.
 
         Returns:
             pd.DataFrame: A DataFrame containing regression input data (attributes and target).
         """
 
+        G = group.network
         data = []
 
-        for node1, node2, edge in G.edges(data=True):
+        for agent1, agent2, edge in G.edges(data=True):
             row = {}
 
             for attr in self.attributes:
-                value1 = G.nodes[node1].get(attr, 0)
-                value2 = G.nodes[node2].get(attr, 0)
+                value1 = getattr(agent1, attr, None)
+                value2 = getattr(agent2, attr, None)
                 max_attribute_distance = self.max_distances[attr]
 
                 # Absolute differences for continuous attributes
@@ -45,20 +46,20 @@ class RegressionRunner:
         return pd.DataFrame(data)
 
 
-    def perform_group_regression(self, group_graphs):
+    def perform_group_regression(self, groups):
         """
-        Performs regression on group graphs to recover weights for attributes based on predicted weights.
+        Performs regression on a list of groups to recover weights for attributes.
 
         Parameters:
-            group_graphs (dict): Dictionary of graphs, keyed by group ID.
+            groups (list[Group]): List of Group objects.
 
         Returns:
             pd.DataFrame: A DataFrame with recovered weights for each group.
         """
         recovered_weights_by_group = []
 
-        for group_id, G in group_graphs.items():
-            regression_data = self.prepare_group_regression_data(G)
+        for group in groups:
+            regression_data = self.prepare_group_regression_data(group)
             X = regression_data[self.attributes]
             Y = regression_data['target']
 
@@ -69,12 +70,11 @@ class RegressionRunner:
             normalized_recovered_weights = recovered_weights / recovered_weights.sum()
 
             recovered_weights_by_group.append({
-                'group_id': group_id,
+                'group_id': group.group_id,
                 **normalized_recovered_weights.to_dict()
             })
 
-        recovered_weights_df = pd.DataFrame(recovered_weights_by_group)
-        return recovered_weights_df
+        return pd.DataFrame(recovered_weights_by_group)
     
 
     def display_results(self, recovered_weights_df, true_weights=None):

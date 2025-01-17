@@ -1,24 +1,23 @@
-def linear_homophily_function(node1, node2, G, weights, max_distances): #TODO: incorporate euclidean distance?
+def linear_homophily_function(agent1, agent2, weights, max_distances): #TODO: incorporate euclidean distance?
     """
     Calculates the homophily score (e.g., tie strength between two individuals based on their trait compatibility).
 
     Parameters:
-        node1 (int): The first node in the graph (representing inidividual 1).
-        node2 (int): The second node in the graph (representing individual 2).
-        G (networkx.Graph): The graph containing the nodes.
+        node1 (int): First agent.
+        node2 (int): Second agent .
         weights (dict): Weights for each attribute.
         max_distances (dict): Maximum possible distances for each trait (for normalization purposes).
 
     Returns:
         float: Homophily score between 0 and 1.
     """
-
     normalized_total_distance = 0
     max_normalized_total_distance = sum(weights.values())
 
     for attribute, weight in weights.items():
-        value1 = G.nodes[node1].get(attribute)
-        value2 = G.nodes[node2].get(attribute)
+        value1 = getattr(agent1, attribute, None)
+        value2 = getattr(agent2, attribute, None)
+
         max_attribute_distance = max_distances[attribute]
 
         #handle continuous variables
@@ -38,7 +37,7 @@ def linear_homophily_function(node1, node2, G, weights, max_distances): #TODO: i
     # Output score between 0 and 1
     score = 1 - (normalized_total_distance / max_normalized_total_distance)
     return round(score, 2)
-    pass
+    
 
 
 #Function registry

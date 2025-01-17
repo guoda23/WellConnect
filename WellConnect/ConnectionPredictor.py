@@ -20,20 +20,24 @@ class ConnectionPredictor:
         self.max_distances = max_distances
         
 
-    def predict_weights(self, group_graph_dict):
+    def predict_weights(self, G):
         """
         Assigns predicted weights to edges in group graphs using the homophily function.
 
         Parameters:
-            group_graph_dict (dict): Dictionary of graphs, keyed by group ID.
+        - G (networkx.Graph): The graph to predict connection weights for.
 
         Returns:
-            dict: Updated group graphs with edge weights assigned.
+        - networkx.Graph: Updated graph with edge weights assigned.
         """ 
-
-        for group_id, G in group_graph_dict.items():
-            for node1, node2 in G.edges():
-                weight = self.homophily_function(node1, node2, G, self.weights, self.max_distances)
-                G.edges[node1, node2]['weight'] = weight
-        return group_graph_dict
+        
+        for agent1, agent2 in G.edges():
+            weight = self.homophily_function(
+                agent1=agent1,
+                agent2=agent2,
+                weights=self.weights,
+                max_distances=self.max_distances
+            )
+            G.edges[agent1, agent2]['weight'] = weight
+        return G
     
