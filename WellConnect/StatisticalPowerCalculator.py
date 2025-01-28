@@ -24,6 +24,21 @@ class StatisticalPowerCalculator:
         self.confidence_level = confidence_level
 
 
+    def absolute_error(self):
+        total_differences_per_group = {}
+        
+        for group_id, row in self.recovered_weights_df.iterrows():
+            group_difference = 0
+
+            for attribute, true_value in self.true_weights.items():
+                recovered_value = row[attribute]
+                group_difference += abs(recovered_value - true_value)
+        
+            total_differences_per_group[group_id] = group_difference 
+
+        return total_differences_per_group
+
+
     def bootstrap_confidence_interval(self, data):
         """
         Computes the bootstrap confidence interval for the given data.
@@ -117,5 +132,6 @@ class StatisticalPowerCalculator:
             "bias": round(bias, 3),
             "mse": round(mse, 3),
             "confidence_interval": (round(lower_bound, 3), round(upper_bound, 3)),
+            "absolute_error": self.absolute_error()
         }
 
