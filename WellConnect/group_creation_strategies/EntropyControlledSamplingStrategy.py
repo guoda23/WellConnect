@@ -6,6 +6,7 @@ from scipy.stats import entropy
 from entities.Group import Group
 from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
+
 class EntropyControlledSamplingStrategy(GroupCreationStrategy): 
     def __init__(self, agents, group_size, target_entropy, trait, tolerance, num_groups=None, seed=None):
         """

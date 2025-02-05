@@ -4,7 +4,7 @@ from datetime import datetime
 
 from DataHandler import DataHandler
 from GroupCreator import GroupCreator
-from group_creation_strategies import RandomSamplingStrategy, TraitBasedStrategy, EntropyControlledSamplingStrategy
+from group_creation_strategies import RandomSamplingStrategy, TraitBasedStrategy, EntropyControlledSamplingStrategy, MultiTraitEntropySamplingStrategy
 from ConnectionPredictor import ConnectionPredictor
 from RegressionRunner import RegressionRunner
 from StatisticalPowerCalculator import StatisticalPowerCalculator
@@ -47,6 +47,10 @@ class WellConnectController:
         elif strategy == "entropy-controlled":
             self.group_creator = GroupCreator(
                 EntropyControlledSamplingStrategy(self.agents, self.group_size, **kwargs)
+            )
+        elif strategy == "multi-trait-entropy":
+            self.group_creator = GroupCreator(
+                MultiTraitEntropySamplingStrategy(self.agents, self.group_size, **kwargs)
             )
         else:
             raise ValueError("Unknown strategy: Choose 'random', 'trait_based', or 'entropy_controlled'")

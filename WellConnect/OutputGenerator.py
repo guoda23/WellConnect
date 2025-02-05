@@ -86,7 +86,7 @@ class OutputGenerator:
         plt.title("3D Visualization of Group Metrics")
 
         # Add a color bar to show the mapping of Z-axis values to colors
-        cbar = plt.colorbar(scatter, ax=ax, shrink=0.5, aspect=10, alpha=0.7)
+        cbar = plt.colorbar(scatter, ax=ax, shrink=0.5, aspect=10, alpha=0.5)
         cbar.set_label(z_label)
 
         # Show the plot

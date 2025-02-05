@@ -24,15 +24,19 @@ class StatisticalPowerCalculator:
         self.confidence_level = confidence_level
 
 
-    def absolute_error(self):
+    def absolute_error(self, NaN_penalty = 1):
         total_differences_per_group = {}
         
         for group_id, row in self.recovered_weights_df.iterrows():
             group_difference = 0
 
-            for attribute, true_value in self.true_weights.items():
+            for attribute, true_value in self.true_weights.items(): #for every group, add up the error for every attribute column
                 recovered_value = row[attribute]
-                group_difference += abs(recovered_value - true_value)
+
+                if pd.isna(recovered_value):
+                    group_difference += NaN_penalty
+                else:
+                    group_difference += abs(recovered_value - true_value)
         
             total_differences_per_group[group_id] = group_difference 
 
