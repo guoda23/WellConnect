@@ -20,7 +20,7 @@ class OutputGenerator:
 
         for folder in os.listdir(self.batch_folder): #loop over subfolders in the batch
             folder_path = os.path.join(self.batch_folder, folder)
-            if os.path.isdir(folder_path): #ensure a subfolder
+            if os.path.isdir(folder_path): #ensure a subfolder (e.g. "experiment_run_1")
                 # print(f"Found folder: {folder}") 
 
                 #load experiment data from pickle file
@@ -40,28 +40,33 @@ class OutputGenerator:
     def extract_metrics(self, stat_power_measure = 'absolute_error'):
         data =[]
 
-        for folder, experiment in self.experiment_data.items():
-            #x-axis
-            trait_entropy = experiment['params']['target_entropy']        
+        for folder, experiment in self.experiment_data.items(): #for cohort in cohort batch
+            #extracting aggregate variables for the entire cohort
+            trait_entropy = experiment['params']['target_entropy'] 
 
-            #y-axis
             weight_dict = experiment['params']['base_weights']
             weight_entropy = self._calculate_entropy(weight_dict)
 
-            #z-axis and Group object
             measure_dict = experiment["measure_dict"][stat_power_measure]
+
             groups_list = experiment["groups"]
 
+            recovered_weights_df = experiment["recovered_weights_df"]
+
+            #unpacking aggregate variable for the entire cohort to represent a specific group in the cohort
             for group in groups_list:
-                group_network = group.network  # The actual group
-                group_absolute_error = measure_dict[group.group_id - 1] #TODO: check if this indexing is right (now reduced by 1 bcz groups start at 1, not 0)
+                group_id_within_cohort = group.group_id - 1 #TODO: check if this indexing is right (now reduced by 1 bcz groups start at 1, not 0)
+                group_absolute_error = measure_dict[group_id_within_cohort] 
 
                 # Append extracted data to the list
                 data.append({
                     "weight_entropy": weight_entropy,  # X-axis
                     "trait_entropy": trait_entropy,  # Y-axis
                     "stat_power": group_absolute_error,  # Z-axis
-                    "group_network": group_network  # The actual networkx Graph
+                    "group": group,  # The Group Object
+                    "recovered_weights_df": recovered_weights_df, # The recovered weights DataFrame
+                    "true_weights": weight_dict,  # The true weights
+                    "row_of_interest_in_table": group_id_within_cohort  # The row of interest in the recovered weights table
                 })
 
         return data
@@ -74,7 +79,7 @@ class OutputGenerator:
         return shannon_entropy
 
 
-    def plot_3d(self, data, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"):
+    def plot_3d(self, data, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO: remove once interactive plot is ready (run_3d_visualization())
         """
         Create a 3D scatter plot using the extracted data.
         """
@@ -104,7 +109,7 @@ class OutputGenerator:
         plt.show()
 
 
-    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"):
+    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO:remove this method after restructuring the visualizer
         data = self.extract_metrics()
         visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
         visualizer.run()

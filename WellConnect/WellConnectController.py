@@ -8,7 +8,8 @@ from group_creation_strategies import RandomSamplingStrategy, TraitBasedStrategy
 from ConnectionPredictor import ConnectionPredictor
 from RegressionRunner import RegressionRunner
 from StatisticalPowerCalculator import StatisticalPowerCalculator
-
+from OutputGenerator import OutputGenerator
+from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 class WellConnectController:
     def __init__(self, data_path, group_size, attributes, max_distances, weights, file_type = 'csv'):
@@ -108,4 +109,6 @@ class WellConnectController:
             pickle.dump(experiment_data, f)
 
         print(f"Experiment data saved to {filename}")
+
+
 

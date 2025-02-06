@@ -1,4 +1,5 @@
 import networkx as nx
+import pandas as pd
 
 class Group:
     def __init__(self, group_id, members=None):
@@ -108,6 +109,23 @@ class Group:
 
         self.network = G
         return G
+
+
+    def get_attribute_table(self):
+        """Created a Pandas DataFrame with agent IDs and attribute values ."""
+        data = []
+        cols = list(self.members[0].__dict__.keys())
+              
+        for agent in self.members:
+            row = {'agent_id': agent.agent_id}
+
+            for key, value in agent.__dict__.items():
+                row[key] = value
+
+            data.append(row)
+
+        df = pd.DataFrame(data, columns=cols)
+        return df
 
 
     def __repr__(self):
