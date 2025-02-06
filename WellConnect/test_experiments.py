@@ -89,9 +89,17 @@
 
 
 
+# #Plotting
+# from OutputGenerator import OutputGenerator
+
+# output_gen = OutputGenerator("Experiment_data/batch_2025-02-05_14-15-34")
+# data = output_gen.extract_metrics(stat_power_measure="absolute_error")
+# output_gen.plot_3d(data)
+
+
 #Plotting
 from OutputGenerator import OutputGenerator
 
 output_gen = OutputGenerator("Experiment_data/batch_2025-02-05_14-15-34")
-data = output_gen.extract_metrics(stat_power_measure="absolute_error")
-output_gen.plot_3d(data)
+output_gen.run_3d_visualization()
+

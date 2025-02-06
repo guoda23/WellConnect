@@ -11,7 +11,7 @@ class Group:
         - group_size (int, optional): The expected size of the group. Defaults to None.
         """
 
-        self.group_id = group_id
+        self.group_id = group_id #NOTE that this only unique within one cohort rn!
         self.members = members if members else []
         self.group_size = len(self.members)
         self.network = None

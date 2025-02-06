@@ -1,6 +1,6 @@
 import networkx as nx
 import pandas as pd
-
+#TODO: remove??
 class Visualizer: #TODO: adjust this to communicate with a data file where the graph graphs/data are
     def __init__(self): 
         """Initialize the Visualizer"""

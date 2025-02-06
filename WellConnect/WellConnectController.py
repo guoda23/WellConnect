@@ -69,9 +69,7 @@ class WellConnectController:
 
             #run the social connection predictions (update graphs with weights)
             self.connection_predictor.predict_weights(group.network)
-        
-        for agent in groups[1].members:
-            print(agent)
+            
 
         #run linear regression
         self.regression_runner = RegressionRunner(attributes=self.attributes, max_distances=self.max_distances)
@@ -92,6 +90,7 @@ class WellConnectController:
     
 
     def save_experiment_data(self, groups, recovered_weights_df, params, experiment_folder, measure_dict = None):
+        #one experiment data file contains one cohort run i.e. the number of groups specified from the population
         os.makedirs(experiment_folder, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = os.path.join(experiment_folder, f"experiment_{timestamp}.pkl")

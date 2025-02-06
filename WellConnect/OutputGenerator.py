@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import entropy
 import numpy as np
+import networkx as nx
+
+from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 
 class OutputGenerator:
@@ -13,24 +16,25 @@ class OutputGenerator:
 
 
     def _load_experiment_data(self):
-        experiments = {}
+        all_experiments_data = {}
 
         for folder in os.listdir(self.batch_folder): #loop over subfolders in the batch
             folder_path = os.path.join(self.batch_folder, folder)
             if os.path.isdir(folder_path): #ensure a subfolder
-                print(f"Found folder: {folder}") 
+                # print(f"Found folder: {folder}") 
 
                 #load experiment data from pickle file
                 for file in os.listdir(folder_path):
                     if file.endswith(".pkl"):
                         filepath = os.path.join(folder_path, file)
-                        print(f"Loading data from: {filepath}")
+                        # print(f"Loading data from: {filepath}")
+
                         with open(filepath, "rb") as f:
-                            experiment_data = pickle.load(f)
-                            experiments[filepath] = experiment_data
+                            experiment_data = pickle.load(f) #load one file
+                            all_experiments_data[filepath] = experiment_data #store in main dict
         
-        print(f"Total experiments loaded: {len(experiments)}")
-        return experiments
+        # print(f"Total experiments loaded: {len(all_experiments_data)}")
+        return all_experiments_data
     
 
     def extract_metrics(self, stat_power_measure = 'absolute_error'):
@@ -44,13 +48,20 @@ class OutputGenerator:
             weight_dict = experiment['params']['base_weights']
             weight_entropy = self._calculate_entropy(weight_dict)
 
-            #z-axis
-            for group_id, group_absolute_error in experiment['measure_dict'][stat_power_measure].items():
+            #z-axis and Group object
+            measure_dict = experiment["measure_dict"][stat_power_measure]
+            groups_list = experiment["groups"]
+
+            for group in groups_list:
+                group_network = group.network  # The actual group
+                group_absolute_error = measure_dict[group.group_id - 1] #TODO: check if this indexing is right (now reduced by 1 bcz groups start at 1, not 0)
+
+                # Append extracted data to the list
                 data.append({
-                    "group_id": group_id,
-                    "weight_entropy": weight_entropy,
-                    "trait_entropy": trait_entropy,
-                    "stat_power": group_absolute_error
+                    "weight_entropy": weight_entropy,  # X-axis
+                    "trait_entropy": trait_entropy,  # Y-axis
+                    "stat_power": group_absolute_error,  # Z-axis
+                    "group_network": group_network  # The actual networkx Graph
                 })
 
         return data
@@ -92,9 +103,13 @@ class OutputGenerator:
         # Show the plot
         plt.show()
 
-    def run_experiment(self):
+
+    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"):
         data = self.extract_metrics()
-        self.plot_3d(data)
+        visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
+        visualizer.run()
+
+
 
 
 
