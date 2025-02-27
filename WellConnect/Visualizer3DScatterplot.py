@@ -130,7 +130,7 @@ class Visualizer3DScatterPlot:
         return fig
 
 
-    def plot_network(self, group_network, edge_width=2):
+    def plot_network(self, group_network, edge_thickness_range=(1, 5)):
         """ Generates a 2D network visualization using Plotly with edge weights and labels. """
         G = group_network
 
@@ -182,14 +182,28 @@ class Visualizer3DScatterPlot:
         if not edge_weights:
             return go.Figure() # Return empty figure if no edges are processed
 
+        # Normalize weights to fit within the provided thickness range
+        min_weight = min(edge_weights) if edge_weights else 0
+        max_weight = max(edge_weights) if edge_weights else 1  # Avoid division by zero
+
+        min_thickness, max_thickness = edge_thickness_range
+
         edge_trace = []
         for i in range(len(edge_x) // 2):
-            edge_trace.append(go.Scatter(
-                x=[edge_x[2 * i], edge_x[2 * i + 1]], y=[edge_y[2 * i], edge_y[2 * i + 1]],
-                mode='lines',
-                line=dict(width=edge_width, color='gray'),
-                hoverinfo='none'
-            ))
+            edge_weight = edge_weights[i]
+
+            if edge_weight > 0.001:  # Only draw edges if there's a connection
+                norm_weight = (edge_weight - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 1
+                thickness = min_thickness + norm_weight * (max_thickness - min_thickness)
+
+                edge_trace.append(go.Scatter(
+                    x=[edge_x[2 * i], edge_x[2 * i + 1]],
+                    y=[edge_y[2 * i], edge_y[2 * i + 1]],
+                    mode='lines',
+                    line=dict(width=thickness, color='gray'),
+                    hoverinfo='none'
+                ))
+
 
         # Create Plotly figures for nodes
         node_trace = go.Scatter(
@@ -201,9 +215,20 @@ class Visualizer3DScatterPlot:
         )
 
         # Create Plotly figures for edge labels (weights)
+
+        edge_label_x = []
+        edge_label_y = []
+        edge_labels = []
+
+        for i in range(len(edge_mid_x)):  # Iterate over the midpoints
+            if edge_weights[i] > 0.001:  # Filter out edges with no homophily
+                edge_label_x.append(edge_mid_x[i])
+                edge_label_y.append(edge_mid_y[i])
+                edge_labels.append(f'{edge_weights[i]:.2f}')  # Keep only meaningful labels
+
         edge_label_trace = go.Scatter(
-            x=edge_mid_x,
-            y=edge_mid_y,
+            x=edge_label_x,
+            y=edge_label_y,
             mode='text',
             text=edge_labels,
             textposition='top center',
@@ -230,6 +255,10 @@ class Visualizer3DScatterPlot:
         group_data = self.data[selected_index]
         df_regression = group_data['recovered_weights_df']
         true_weights = group_data['true_weights']
+
+        # Display NaN values
+        df_regression = df_regression.fillna("N/A")
+
 
         # Add the true weights as a row to the DataFrame
         true_weights_row = {'group_id': 'TRUE'}  # Set 'group_id' to 'TRUE' for the true weights row

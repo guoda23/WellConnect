@@ -72,7 +72,7 @@ class OutputGenerator:
         return data
 
 
-    def _calculate_entropy(self, weight_dict):
+    def _calculate_entropy(self, weight_dict): # how evenly distributed are the weights? More uniform weight dist -> higher entropy
         '''pass a dictionary of values, returns the entropy'''
         weights = list(weight_dict.values())
         shannon_entropy = entropy(weights, base=2)
@@ -82,6 +82,7 @@ class OutputGenerator:
     def plot_3d(self, data, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO: remove once interactive plot is ready (run_3d_visualization())
         """
         Create a 3D scatter plot using the extracted data.
+        !Non-interactive!
         """
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -109,7 +110,8 @@ class OutputGenerator:
         plt.show()
 
 
-    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO:remove this method after restructuring the visualizer
+    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"):
+        """Runs the interactive 3D plot in the browser"""
         data = self.extract_metrics()
         visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
         visualizer.run()
