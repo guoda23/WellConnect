@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from WellConnectController import WellConnectController
 
+#NB: this test script is linked to 'Experiment_data' folder
 
 BASE_WEIGHTS_LIST = [
     {'age': 0.33, 'education': 0.33, 'gender': 0.34}, # Equal distribution -> High entropy
@@ -24,7 +25,8 @@ MAX_DISTANCES = {
     'gender': 1
 }
 
-ATTRIBUTES = ['age', 'education', 'gender']
+ATTRIBUTES = ['age', 'education', 'gender',
+              'PHQ9_Total', 'PANCRS_TotalPositive', 'PANCRS_TotalNegative', 'PANCRS_FrequencyPositive', 'PANCRS_FrequencyNegative']
 SEED = 123
 GROUP_SIZE = 10
 NUM_GROUPS = 8
@@ -57,7 +59,7 @@ for base_weights in BASE_WEIGHTS_LIST:
         params['target_entropy'] = target_entropy
         params['base_weights'] = base_weights
 
-        controller = WellConnectController(data_path='binary_age_gender_edu.csv',
+        controller = WellConnectController(data_path='binary_age_gender_edu_with_depression_corumination.csv',
                                         group_size=GROUP_SIZE,
                                         attributes=ATTRIBUTES,
                                         max_distances=MAX_DISTANCES,

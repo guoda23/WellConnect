@@ -73,7 +73,7 @@ class WellConnectController:
             
 
         #run linear regression
-        self.regression_runner = RegressionRunner(attributes=self.attributes, max_distances=self.max_distances)
+        self.regression_runner = RegressionRunner(attributes=list(self.weights.keys()), max_distances=self.max_distances)
         recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups)
         
         if mode == 'synthetic data':

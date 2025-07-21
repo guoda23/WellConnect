@@ -1,0 +1,1 @@
+This experiments folder is temporary (for test_controller). "Experiment_data" is the main one. It's used in test_experiments.py

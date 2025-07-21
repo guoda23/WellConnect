@@ -31,8 +31,8 @@ class TransmissionSimulator:
         else:
             raise ValueError(f"Model type '{model_type}' is not recognized.")
         
-    def run(self):
+    def run(self, group, steps):
         """
         Runs the selected model and returns its output.
         """
-        return self.model.run()
+        return self.model.run(group, steps)

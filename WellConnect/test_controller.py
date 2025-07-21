@@ -3,6 +3,10 @@ from datetime import datetime
 
 from WellConnectController import WellConnectController
 
+#NB: this test script is linked to 'experiments' data folder
+#(does not do a parameter sweep but checks if controller works for one set of params)
+
+
 BASE_WEIGHTS = { # Sum of weights should be 1
     'age': 0.33,
     'education': 0.33,
@@ -15,7 +19,8 @@ MAX_DISTANCES = {
     'gender': 1
 }
 
-ATTRIBUTES = ['age', 'education', 'gender']
+ATTRIBUTES = ['age', 'education', 'gender',
+              'PHQ9_Total', 'PANCRS_TotalPositive', 'PANCRS_TotalNegative', 'PANCRS_FrequencyPositive', 'PANCRS_FrequencyNegative']
 SEED = 123
 GROUP_SIZE = 10
 NUM_GROUPS = 10
@@ -66,13 +71,12 @@ controller.save_experiment_data(groups,
 #test plot generation
 from OutputGenerator import OutputGenerator
 
-# batch_folder = "experiments/batch_2025-01-28_13-39-20"
-batch_folder = "experiments/batch_2025-04-22_10-59-18"
+batch_folder = "experiments/batch_2025-06-21_14-21-18"
 
 output_gen = OutputGenerator(batch_folder)
 
-# Step 1: Extract the data
-data = output_gen.extract_metrics(stat_power_measure="absolute_error")
+# # Step 1: Extract the data
+# data = output_gen.extract_metrics(stat_power_measure="absolute_error")
 
-# Step 2: Plot the 3D scatter plot
-output_gen.plot_3d(data)
+# # Step 2: Plot the 3D scatter plot
+# output_gen.plot_3d(data)
