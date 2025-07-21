@@ -115,8 +115,3 @@ class OutputGenerator:
         data = self.extract_metrics()
         visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
         visualizer.run()
-
-
-
-
-

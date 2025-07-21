@@ -66,7 +66,9 @@ controller.save_experiment_data(groups,
 #test plot generation
 from OutputGenerator import OutputGenerator
 
-batch_folder = "experiments/batch_2025-01-28_13-39-20"
+# batch_folder = "experiments/batch_2025-01-28_13-39-20"
+batch_folder = "experiments/batch_2025-04-22_10-59-18"
+
 output_gen = OutputGenerator(batch_folder)
 
 # Step 1: Extract the data

@@ -10,7 +10,7 @@ class Agent:
         self.agent_id = agent_id
 
         for key, value in attribute_dict.items():
-            setattr(self, key, value) #dynamically create attributes
+            setattr(self, key, value) #dynamically create attributes (depending on which ones are selected)
 
 
     def __eq__(self, other):

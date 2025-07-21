@@ -1,0 +1,9 @@
+Experiment data contains a dictionary:
+        
+    experiment_data = { 
+        "groups": groups,
+        "recovered_weights_df": recovered_weights_df,
+        "params": params,
+        "measure_dict": measure_dict,
+        "timestamp": timestamp
+    }
