@@ -4,7 +4,7 @@ import numpy as np
 class BoundedConfidenceVoterModel:
     """Simulates depression transmission using a bounded confidence update."""
 
-    def __init__(self, target_attr="phq9_total", threshold=0.5, mu=0.5,
+    def __init__(self, target_attr="PHQ9_Total", threshold=0.5, mu=0.5,
                  brooding_weight=0.5, reflecting_weight=0.5):
         """
         Initialize the model with parameters.
