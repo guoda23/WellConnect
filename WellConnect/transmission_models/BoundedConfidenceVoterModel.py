@@ -16,7 +16,7 @@ class BoundedConfidenceVoterModel:
         threshold : float
             Minimum edge weight for influence.
         mu : float
-            Base influence strength.
+            Base influence strength (how much people are affected by others).
         brooding_weight : float
             Weight for brooding (negative effect).
         reflecting_weight : float
@@ -64,7 +64,6 @@ class BoundedConfidenceVoterModel:
             if relevant_scores: 
                 neighbour_mean = np.mean(relevant_scores)
 
-                #TODO: make sure the attribute names correspond to the data structure
                 crt_neg = getattr(agent, self.corumination_neg_total_attr)
                 freq_neg = getattr(agent, self.corumination_pos_total_attr)
                 crt_pos = getattr(agent, self.corumination_pos_freq_attr)
@@ -72,7 +71,7 @@ class BoundedConfidenceVoterModel:
 
                 brooding = self.brooding_weight * (crt_neg + freq_neg) / 10.0
                 reflection = self.reflecting_weight * (crt_pos + freq_pos) / 10.0
-                processing_bias = np.clip(brooding - reflection, -1, 1)
+                processing_bias = np.clip(brooding - reflection) # min -1, max 1
                 
                 current = getattr(agent, self.target_attr)
                 mu_i = self.mu * processing_bias
