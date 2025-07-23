@@ -43,10 +43,10 @@ def test_voter_model_on_group(group, steps=5):
     sim = TransmissionSimulator(
         model_type='BoundedConfidenceVoterModel',
         target_attr="PHQ9_Total",
-        threshold=0.5,
-        mu=0.5,
-        brooding_weight=0.5,
-        reflecting_weight=0.5
+        threshold=0.8,
+        mu=0.2,
+        # brooding_weight=0.5,
+        # reflecting_weight=0.5
     )
     history, agents = sim.run(group, steps=steps)
 
@@ -69,5 +69,5 @@ if __name__ == "__main__":
     PKL = "Experiment_data/batch_2025-07-21_14-57-39/experiment_run_1/experiment_2025-07-21_14-57-39.pkl"
     group = load_group_from_pickle(PKL, idx=0)
 
-    test_hmdh_model_on_group(group, steps=50)
-    # test_voter_model_on_group(group, steps=50)
+    # test_hmdh_model_on_group(group, steps=50)
+    test_voter_model_on_group(group, steps=10)

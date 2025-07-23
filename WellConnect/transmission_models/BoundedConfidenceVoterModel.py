@@ -4,8 +4,8 @@ import numpy as np
 class BoundedConfidenceVoterModel:
     """Simulates depression transmission using a bounded confidence update."""
 
-    def __init__(self, target_attr="PHQ9_Total", threshold=0.5, mu=0.5,
-                 brooding_weight=0.5, reflecting_weight=0.5):
+    def __init__(self, target_attr="PHQ9_Total", threshold=0.5, mu=0.5):
+                #  brooding_weight=0.5, reflecting_weight=0.5):
         """
         Initialize the model with parameters.
 
@@ -29,8 +29,8 @@ class BoundedConfidenceVoterModel:
         self.corumination_neg_freq_attr = 'PANCRS_FrequencyNegative'
         self.threshold = threshold
         self.mu = mu
-        self.brooding_weight = brooding_weight
-        self.reflecting_weight = reflecting_weight
+        # self.brooding_weight = brooding_weight
+        # self.reflecting_weight = reflecting_weight
         self.history = []
 
 
@@ -68,13 +68,14 @@ class BoundedConfidenceVoterModel:
                 freq_neg = getattr(agent, self.corumination_pos_total_attr)
                 crt_pos = getattr(agent, self.corumination_pos_freq_attr)
                 freq_pos = getattr(agent, self.corumination_neg_freq_attr)
+                freq_corumination = np.mean([freq_neg, freq_pos])
 
-                brooding = self.brooding_weight * (crt_neg + freq_neg) / 10.0
-                reflection = self.reflecting_weight * (crt_pos + freq_pos) / 10.0
-                processing_bias = np.clip(brooding - reflection) # min -1, max 1
-                
+                # Calculate total co-rumination effect that will scale the social influence
+                # TODO: check if this type of scaling is appropriate
+                co_rumination_effect = (crt_neg + crt_pos + freq_corumination) / 15.0
+
                 current = getattr(agent, self.target_attr)
-                mu_i = self.mu * processing_bias
+                mu_i = self.mu * co_rumination_effect
                 updated = np.clip(current + mu_i * (neighbour_mean - current), 0, 27)
 
                 setattr(agent, self.target_attr, updated)
