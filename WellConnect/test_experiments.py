@@ -5,34 +5,34 @@ from WellConnectController import WellConnectController
 #NB: this test script is linked to 'Experiment_data' folder
 
 BASE_WEIGHTS_LIST = [
-    {'Age_binary': 0.33, 'EducationLevel_binary': 0.33, 'Gender_binary': 0.34}, # Equal distribution -> High entropy
-    {'Age_binary': 0.5, 'EducationLevel_binary': 0.2, 'Gender_binary': 0.3},    # More uneven distribution -> Lower entropy
-    {'Age_binary': 0.8, 'EducationLevel_binary': 0.1, 'Gender_binary': 0.1},    # Highly skewed distribution -> Very low entropy
-    {'Age_binary': 0.25, 'EducationLevel_binary': 0.25, 'Gender_binary': 0.5},  # Slight skew -> Moderate entropy
-    {'Age_binary': 0.6, 'EducationLevel_binary': 0.1, 'Gender_binary': 0.3},    # Another skewed distribution -> Lower entropy
-    {'Age_binary': 0.1, 'EducationLevel_binary': 0.7, 'Gender_binary': 0.2},    # Skewed with very low values for 'age' -> Lower entropy
-    {'Age_binary': 0.15, 'EducationLevel_binary': 0.35, 'Gender_binary': 0.5},  # More moderate distribution -> Moderate entropy
-    {'Age_binary': 0.1, 'EducationLevel_binary': 0.1, 'Gender_binary': 0.8},    # Highly concentrated -> Very low entropy
-    {'Age_binary': 0.45, 'EducationLevel_binary': 0.45, 'Gender_binary': 0.1},  # Skewed with high value on 'age' and 'education' -> Low entropy
-    {'Age_binary': 0.25, 'EducationLevel_binary': 0.5, 'Gender_binary': 0.25},  # Balanced distribution -> Higher entropy
+    {'Age_tertiary': 0.33, 'EducationLevel_tertiary': 0.33, 'Gender_tertiary': 0.34}, # Equal distribution -> High entropy
+    {'Age_tertiary': 0.5, 'EducationLevel_tertiary': 0.2, 'Gender_tertiary': 0.3},    # More uneven distribution -> Lower entropy
+    {'Age_tertiary': 0.8, 'EducationLevel_tertiary': 0.1, 'Gender_tertiary': 0.1},    # Highly skewed distribution -> Very low entropy
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.25, 'Gender_tertiary': 0.5},  # Slight skew -> Moderate entropy
+    {'Age_tertiary': 0.6, 'EducationLevel_tertiary': 0.1, 'Gender_tertiary': 0.3},    # Another skewed distribution -> Lower entropy
+    {'Age_tertiary': 0.1, 'EducationLevel_tertiary': 0.7, 'Gender_tertiary': 0.2},    # Skewed with very low values for 'age' -> Lower entropy
+    {'Age_tertiary': 0.15, 'EducationLevel_tertiary': 0.35, 'Gender_tertiary': 0.5},  # More moderate distribution -> Moderate entropy
+    {'Age_tertiary': 0.1, 'EducationLevel_tertiary': 0.1, 'Gender_tertiary': 0.8},    # Highly concentrated -> Very low entropy
+    {'Age_tertiary': 0.45, 'EducationLevel_tertiary': 0.45, 'Gender_tertiary': 0.1},  # Skewed with high value on 'age' and 'education' -> Low entropy
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.5, 'Gender_tertiary': 0.25},  # Balanced distribution -> Higher entropy
 ]                       
 
 TARGET_ENTROPY_LIST = [0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
 
 MAX_DISTANCES = {
-    'Age_binary': 1,
-    'EducationLevel_binary': 1,
-    'Gender_binary': 1
+    'Age_tertiary': 1,
+    'EducationLevel_tertiary': 1,
+    'Gender_tertiary': 1
 }
 
-ATTRIBUTES = ['Age_binary', 'EducationLevel_binary', 'Gender_binary']
+ATTRIBUTES = ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
             #   'PHQ9_Total', 'PANCRS_TotalPositive', 'PANCRS_TotalNegative', 'PANCRS_FrequencyPositive', 'PANCRS_FrequencyNegative']
 SEED = 123
 GROUP_SIZE = 10
 NUM_GROUPS = 8
 GROUP_FORMATION = "multi-trait-entropy"
 ENTROPY_TOL = 0
-TRAIT_OF_INTEREST = 'Gender_binary'
+TRAIT_OF_INTEREST = 'Gender_tertiary'
 
 params = {
     'max_distances': MAX_DISTANCES,
