@@ -17,7 +17,7 @@ class WellConnectController:
 
         self.population_data = self.data_handler.read_data()
         self.group_size = group_size
-        self.attributes = attributes #TODO: automate this
+        self.attributes = attributes #TODO: automate this? maybe good to keep separate for subsetting traits
         self.max_distances = max_distances #TODO" automate this
         self.weights = weights 
         self.agents = self.data_handler.create_agents(self.population_data, self.attributes)

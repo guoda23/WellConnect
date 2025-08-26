@@ -32,6 +32,7 @@ class DataHandler:
 
 
     def create_agents(self, data_df, relevant_attributes, id_column=None): #TODO:impute missing values?
+        #TODO: move this elsewhere
         """
         Creates a list of Agent objects from the dataset.
 
