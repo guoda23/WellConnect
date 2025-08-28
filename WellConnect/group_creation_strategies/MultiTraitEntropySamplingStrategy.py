@@ -10,7 +10,7 @@ from group_creation_strategies.GroupCreationStrategy import GroupCreationStrateg
 class MultiTraitEntropySamplingStrategy(GroupCreationStrategy): 
     def __init__(self, agents, group_size, target_entropy, traits, tolerance, num_groups=None, seed=None):
         """
-        Initializes the entropy-controlled sampling strategy.
+        Initializes the entropy-controlled sampling strategy (for joint entroy of traits).
 
         Parameters:
         - agents (list[Agent]): The dataset containing Agent objects.

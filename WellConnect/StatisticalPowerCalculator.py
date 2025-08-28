@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 #TODO: assess how statistically sound this approach is (This is more of a placeholder)
+#TODO: adapt all methods to be trait specific (right now only absolute error does this!!)
 # N.B. coverage probability seems to make the most sense
 
 import numpy as np
@@ -24,7 +25,7 @@ class StatisticalPowerCalculator:
         self.confidence_level = confidence_level
 
 
-    def absolute_error(self, NaN_penalty = 1):
+    def combined_absolute_error(self, NaN_penalty = 1):
         total_differences_per_group = {}
         
         for group_id, row in self.recovered_weights_df.iterrows():
@@ -41,6 +42,21 @@ class StatisticalPowerCalculator:
             total_differences_per_group[group_id] = group_difference 
 
         return total_differences_per_group
+    
+
+    def absolute_error(self, attribute, NaN_penalty=1):
+        errors_per_group = {}
+
+        for group_id, row in self.recovered_weights_df.iterrows():
+            recovered_value = row[attribute]
+            true_value = self.true_weights[attribute]
+
+            if pd.isna(recovered_value):
+                errors_per_group[group_id] = NaN_penalty
+            else:
+                errors_per_group[group_id] = abs(recovered_value - true_value)
+
+        return errors_per_group
 
 
     def bootstrap_confidence_interval(self, data):
@@ -108,34 +124,39 @@ class StatisticalPowerCalculator:
         return np.mean((bootstrap_means - true_value) ** 2)
 
 
-    def evaluate_predictive_power(self, attribute): #TODO: polish this for thesis goals. Attribute?
+    def evaluate_predictive_power(self, attributes):
         """
-        Evaluates predictive power for a specific attribute.
+        Evaluates predictive power for specific attributes.
 
         Parameters:
-        - attribute (str): Name of the attribute to evaluate.
+        - attributes (list): List of attribute names to evaluate.
 
         Returns:
-        - dict: Results including coverage probability, bias, MSE, and confidence interval.
+        - dict: for each attribute (key) a dict containing the coverage probability, bias, MSE, and confidence interval.
         """
-        data = self.recovered_weights_df[attribute].values
-        true_value = self.true_weights.get(attribute)
+        measure_dict = {}
 
-        if true_value is None:
-            raise ValueError(f"True weight for attribute '{attribute}' not found.")
+        for attribute in attributes:
+            data = self.recovered_weights_df[attribute].values
+            true_value = self.true_weights.get(attribute)
 
-        lower_bound, upper_bound = self.bootstrap_confidence_interval(data)
-        coverage = self.calculate_coverage_probability(data, true_value)
-        bias = self.calculate_bias(data, true_value)
-        mse = self.calculate_mse(data, true_value)
+            if true_value is None:
+                raise ValueError(f"True weight for attribute '{attribute}' not found.")
 
-        return {
-            "attribute": attribute,
-            "true_value": round(true_value, 3) if isinstance(true_value, (int, float)) else true_value,
-            "coverage_probability": round(coverage, 3),
-            "bias": round(bias, 3),
-            "mse": round(mse, 3),
-            "confidence_interval": (round(lower_bound, 3), round(upper_bound, 3)),
-            "absolute_error": self.absolute_error()
-        }
+            lower_bound, upper_bound = self.bootstrap_confidence_interval(data)
+            coverage = self.calculate_coverage_probability(data, true_value)
+            bias = self.calculate_bias(data, true_value)
+            mse = self.calculate_mse(data, true_value)
+
+            measure_dict[attribute] = {
+                "attribute": attribute,
+                "true_value": round(true_value, 3) if isinstance(true_value, (int, float)) else true_value,
+                "coverage_probability": round(coverage, 3),
+                "bias": round(bias, 3),
+                "mse": round(mse, 3),
+                "confidence_interval": (round(lower_bound, 3), round(upper_bound, 3)),
+                "absolute_error": self.absolute_error(attribute)
+            }
+
+        return measure_dict
 

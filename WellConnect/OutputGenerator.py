@@ -37,7 +37,7 @@ class OutputGenerator:
         return all_experiments_data
     
 
-    def extract_metrics(self, stat_power_measure = 'absolute_error'):
+    def extract_metrics(self, stat_power_measure = 'absolute_error', trait_of_interest='Gender'):
         data =[]
 
         for folder, experiment in self.experiment_data.items(): #for cohort in cohort batch
@@ -47,7 +47,7 @@ class OutputGenerator:
             weight_dict = experiment['params']['base_weights']
             weight_entropy = self._calculate_entropy(weight_dict)
 
-            measure_dict = experiment["measure_dict"][stat_power_measure]
+            measure_dict = experiment["measure_dict"][trait_of_interest][stat_power_measure]
 
             groups_list = experiment["groups"]
 
@@ -79,11 +79,12 @@ class OutputGenerator:
         return shannon_entropy
 
 
-    def plot_3d(self, data, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO: remove once interactive plot is ready (run_3d_visualization())
+    def plot_3d(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO: remove once interactive plot is ready (run_3d_visualization())
         """
         Create a 3D scatter plot using the extracted data.
         !Non-interactive!
         """
+        data = self.extract_metrics(trait_of_interest=trait_of_interest)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
@@ -110,8 +111,156 @@ class OutputGenerator:
         plt.show()
 
 
-    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"):
+    def plot_heatmap(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", cmap="viridis",vmin=None, vmax=None, annotate=False, fmt=".2f", figsize=(6, 5)):
+        """
+        Heatmap where color encodes per-group absolute error.
+        X = weight entropy, Y = trait entropy, Color = 'absolute_error' for the chosen trait.
+        """
+        data = self.extract_metrics(trait_of_interest=trait_of_interest)
+
+        # Collect unique axis values
+        x_vals = sorted(set(d["weight_entropy"] for d in data))
+        y_vals = sorted(set(d["trait_entropy"]  for d in data))
+
+        # Map (x,y) -> list of z to allow averaging if duplicates exist
+        cell = {}
+        for d in data:
+            key = (d["weight_entropy"], d["trait_entropy"])
+            cell.setdefault(key, []).append(d["stat_power"])
+        
+
+        # Build grid [rows=y, cols=x]
+        grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
+        for i, y in enumerate(y_vals):
+            for j, x in enumerate(x_vals):
+                if (x, y) in cell:
+                    zs = cell[(x, y)]
+                    grid[i, j] = float(np.max(zs))  # mean if multiple
+
+        # Plot
+        fig, ax = plt.subplots(figsize=figsize)
+        im = ax.imshow(
+            grid,
+            origin="lower",
+            aspect="auto",
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+        )
+
+        # Ticks show the actual x/y values
+        ax.set_xticks(np.arange(len(x_vals)))
+        ax.set_yticks(np.arange(len(y_vals)))
+        ax.set_xticklabels([f"{v:.2f}" for v in x_vals], rotation=45, ha="right")
+        ax.set_yticklabels([f"{v:.2f}" for v in y_vals])
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.set_title("Heatmap of Group Metrics")
+
+        # Colorbar label: "Absolute error (Trait)"
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label(f"Absolute error ({trait_of_interest})")
+
+        # Optional cell annotations
+        if annotate:
+            for i in range(len(y_vals)):
+                for j in range(len(x_vals)):
+                    val = grid[i, j]
+                    if not np.isnan(val):
+                        ax.text(j, i, format(val, fmt), ha="center", va="center", fontsize=8)
+
+        fig.tight_layout()
+        plt.show()
+
+
+    def plot_heatmaps(self, traits, x_label="Weight Entropy", y_label="Trait Entropy", cmap="viridis", vmin=None, vmax=None, annotate=False, fmt=".2f", figsize_per_plot=(5, 4), round_decimals=None, share_scale=True):
+        """
+        Draw side-by-side heatmaps for multiple traits.
+        X = weight entropy, Y = trait entropy, Color = absolute error (max of duplicates).
+        """
+
+        traits = list(traits)
+        per_trait_cells = []
+        all_x, all_y = set(), set()
+
+        # Collect data for all traits
+        for trait in traits:
+            data = self.extract_metrics(trait_of_interest=trait)
+            cell = {}
+            for d in data:
+                x = d["weight_entropy"]
+                y = d["trait_entropy"]
+                if round_decimals is not None:
+                    x = round(float(x), round_decimals)
+                    y = round(float(y), round_decimals)
+                key = (x, y)
+                cell.setdefault(key, []).append(d["stat_power"])
+            per_trait_cells.append((trait, cell))
+            for (x, y) in cell.keys():
+                all_x.add(x); all_y.add(y)
+
+        x_vals = sorted(all_x)
+        y_vals = sorted(all_y)
+
+        # Build grids per trait
+        grids = []
+        for trait, cell in per_trait_cells:
+            grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
+            for i, y in enumerate(y_vals):
+                for j, x in enumerate(x_vals):
+                    zs = cell.get((x, y))
+                    if zs:
+                        grid[i, j] = float(np.max(zs))  # <- use max for duplicates
+            grids.append((trait, grid))
+
+        # Shared color scale if desired
+        if (vmin is None or vmax is None) and share_scale:
+            stacked = np.concatenate([g[1].ravel() for g in grids])
+            stacked = stacked[~np.isnan(stacked)]
+            if stacked.size > 0:
+                if vmin is None: vmin = float(np.nanmin(stacked))
+                if vmax is None: vmax = float(np.nanmax(stacked))
+
+        # Plotting
+        n = len(traits)
+        fig, axes = plt.subplots(1, n, figsize=(figsize_per_plot[0]*n, figsize_per_plot[1]), squeeze=False)
+        axes = axes[0]
+
+        ims = []
+        for ax, (trait, grid) in zip(axes, grids):
+            im = ax.imshow(grid, origin="lower", aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+            ims.append(im)
+
+            ax.set_xticks(np.arange(len(x_vals)))
+            ax.set_yticks(np.arange(len(y_vals)))
+            ax.set_xticklabels([f"{v:.2f}" if isinstance(v, float) else str(v) for v in x_vals], rotation=45, ha="right")
+            ax.set_yticklabels([f"{v:.2f}" if isinstance(v, float) else str(v) for v in y_vals])
+
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
+            ax.set_title(f"Absolute error ({trait.replace('_', ' ')})")
+
+            if annotate:
+                for i in range(len(y_vals)):
+                    for j in range(len(x_vals)):
+                        val = grid[i, j]
+                        if not np.isnan(val):
+                            ax.text(j, i, format(val, fmt), ha="center", va="center", fontsize=8)
+
+        # Shared colorbar
+        cbar = fig.colorbar(ims[0], ax=axes.tolist(), fraction=0.046, pad=0.08)
+        cbar.set_label("Absolute error")
+
+        # fig.tight_layout(rect=[0, 0, 0.93, 1])
+        plt.show()
+        return fig, axes
+
+
+    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender'):
         """Runs the interactive 3D plot in the browser"""
-        data = self.extract_metrics()
+        #capitalize strip
+        z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
+        data = self.extract_metrics(trait_of_interest=trait_of_interest)
         visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
         visualizer.run()

@@ -31,7 +31,7 @@ GROUP_SIZE = 10
 NUM_GROUPS = 8
 GROUP_FORMATION = "multi-trait-entropy"
 ENTROPY_TOL = 0
-TRAIT_OF_INTEREST = 'Gender'
+TRAITS_OF_INTEREST =  ['Age', 'EducationLevel', 'Gender']
 
 params = {
     'max_distances': MAX_DISTANCES,
@@ -41,7 +41,7 @@ params = {
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
     'entropy_tol': ENTROPY_TOL,
-    'trait_of_interest': TRAIT_OF_INTEREST
+    'traits_of_interest': TRAITS_OF_INTEREST
 }
 
 base_dir = "Experiment_data"
@@ -71,7 +71,7 @@ for base_weights in BASE_WEIGHTS_LIST:
                                                     seed=SEED,
                                                     num_groups=NUM_GROUPS)
         
-        measure_dict = controller.statistical_power_analysis(trait_of_interest=TRAIT_OF_INTEREST, 
+        measure_dict = controller.statistical_power_analysis(traits_of_interest=TRAITS_OF_INTEREST, 
                                                             recovered_weights_df=recovered_weights_df)
 
         experiment_folder = os.path.join(shared_folder, f"experiment_run_{experiment_count}")
