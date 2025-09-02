@@ -56,6 +56,9 @@ class StatisticalPowerCalculator:
             else:
                 errors_per_group[group_id] = abs(recovered_value - true_value)
 
+                if errors_per_group[group_id] > 1:
+                    print(recovered_value, true_value)
+
         return errors_per_group
 
 

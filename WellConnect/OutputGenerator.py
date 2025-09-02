@@ -135,7 +135,7 @@ class OutputGenerator:
             for j, x in enumerate(x_vals):
                 if (x, y) in cell:
                     zs = cell[(x, y)]
-                    grid[i, j] = float(np.max(zs))  # mean if multiple
+                    grid[i, j] = float(np.mean(zs))  # mean if multiple
 
         # Plot
         fig, ax = plt.subplots(figsize=figsize)
@@ -211,7 +211,7 @@ class OutputGenerator:
                 for j, x in enumerate(x_vals):
                     zs = cell.get((x, y))
                     if zs:
-                        grid[i, j] = float(np.max(zs))  # <- use max for duplicates
+                        grid[i, j] = float(np.mean(zs))  # <- use max for duplicates
             grids.append((trait, grid))
 
         # Shared color scale if desired

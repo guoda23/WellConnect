@@ -5,33 +5,88 @@ from WellConnectController import WellConnectController
 #NB: this test script is linked to 'Experiment_data' folder
 
 BASE_WEIGHTS_LIST = [
-    {'Age': 0.33, 'EducationLevel': 0.33, 'Gender': 0.34}, # Equal distribution -> High entropy
-    {'Age': 0.50, 'EducationLevel': 0.20, 'Gender': 0.3},    # More uneven distribution -> Lower entropy
-    {'Age': 0.80, 'EducationLevel': 0.10, 'Gender': 0.1},    # Highly skewed distribution -> Very low entropy
-    {'Age': 0.25, 'EducationLevel': 0.25, 'Gender': 0.5},  # Slight skew -> Moderate entropy
-    {'Age': 0.60, 'EducationLevel': 0.10, 'Gender': 0.3},    # Another skewed distribution -> Lower entropy
-    {'Age': 0.10, 'EducationLevel': 0.70, 'Gender': 0.2},    # Skewed with very low values for 'age' -> Lower entropy
-    {'Age': 0.15, 'EducationLevel': 0.35, 'Gender': 0.5},  # More moderate distribution -> Moderate entropy
-    {'Age': 0.10, 'EducationLevel': 0.10, 'Gender': 0.8},    # Highly concentrated -> Very low entropy
-    {'Age': 0.45, 'EducationLevel': 0.45, 'Gender': 0.1},  # Skewed with high value on 'age' and 'education' -> Low entropy
-    {'Age': 0.25, 'EducationLevel': 0.50, 'Gender': 0.25},  # Balanced distribution -> Higher entropy
-]                       
+    # Equal distribution
+    {'Age_tertiary': 1/3, 'EducationLevel_tertiary': 1/3, 'Gender_tertiary': 1/3},  # High entropy (only 1)
+
+    # (0.50, 0.20, 0.30) -> 6 permutations
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.30},
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.30, 'Gender_tertiary': 0.20},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.30},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.30, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.30, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.30, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.20},
+
+    # (0.70, 0.10, 0.20) -> 6 permutations
+    {'Age_tertiary': 0.70, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.20},
+    {'Age_tertiary': 0.70, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.70, 'Gender_tertiary': 0.20},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.70},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.70, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.70},
+
+    # (0.80, 0.10, 0.10) -> 3 permutations (two values equal)
+    {'Age_tertiary': 0.80, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.80, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.80},
+
+    # (0.25, 0.25, 0.50) -> 3 permutations (two values equal)
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.25, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.25},
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.25, 'Gender_tertiary': 0.25},
+
+    # (0.60, 0.10, 0.30) -> 6 permutations
+    {'Age_tertiary': 0.60, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.30},
+    {'Age_tertiary': 0.60, 'EducationLevel_tertiary': 0.30, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.60, 'Gender_tertiary': 0.30},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.30, 'Gender_tertiary': 0.60},
+    {'Age_tertiary': 0.30, 'EducationLevel_tertiary': 0.60, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.30, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.60},
+
+    # (0.10, 0.70, 0.20) -> 6 permutations
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.70, 'Gender_tertiary': 0.20},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.70},
+    {'Age_tertiary': 0.70, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.20},
+    {'Age_tertiary': 0.70, 'EducationLevel_tertiary': 0.20, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.70},
+    {'Age_tertiary': 0.20, 'EducationLevel_tertiary': 0.70, 'Gender_tertiary': 0.10},
+
+    # (0.15, 0.35, 0.50) -> 6 permutations
+    {'Age_tertiary': 0.15, 'EducationLevel_tertiary': 0.35, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.15, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.35},
+    {'Age_tertiary': 0.35, 'EducationLevel_tertiary': 0.15, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.35, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.15},
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.15, 'Gender_tertiary': 0.35},
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.35, 'Gender_tertiary': 0.15},
+
+    # (0.45, 0.45, 0.10) -> 3 permutations (two values equal)
+    {'Age_tertiary': 0.45, 'EducationLevel_tertiary': 0.45, 'Gender_tertiary': 0.10},
+    {'Age_tertiary': 0.45, 'EducationLevel_tertiary': 0.10, 'Gender_tertiary': 0.45},
+    {'Age_tertiary': 0.10, 'EducationLevel_tertiary': 0.45, 'Gender_tertiary': 0.45},
+
+    # (0.25, 0.50, 0.25) -> 3 permutations (two values equal)
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.50, 'Gender_tertiary': 0.25},
+    {'Age_tertiary': 0.25, 'EducationLevel_tertiary': 0.25, 'Gender_tertiary': 0.50},
+    {'Age_tertiary': 0.50, 'EducationLevel_tertiary': 0.25, 'Gender_tertiary': 0.25},
+]
+           
+
+
 TARGET_ENTROPY_LIST = [0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
 
 MAX_DISTANCES = {
-    'Age': 1,
-    'EducationLevel': 1,
-    'Gender': 1
+    'Age_tertiary': 1,
+    'EducationLevel_tertiary': 1,
+    'Gender_tertiary': 1
 }
 
-ATTRIBUTES = ['Age', 'EducationLevel', 'Gender']
+ATTRIBUTES = ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
             #   'PHQ9_Total', 'PANCRS_TotalPositive', 'PANCRS_TotalNegative', 'PANCRS_FrequencyPositive', 'PANCRS_FrequencyNegative']
 SEED = 123
 GROUP_SIZE = 10
 NUM_GROUPS = 8
 GROUP_FORMATION = "multi-trait-entropy"
 ENTROPY_TOL = 0
-TRAITS_OF_INTEREST =  ['Age', 'EducationLevel', 'Gender']
+TRAITS_OF_INTEREST =  ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
 
 params = {
     'max_distances': MAX_DISTANCES,
