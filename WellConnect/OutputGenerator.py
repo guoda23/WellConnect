@@ -5,6 +5,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import entropy
 import numpy as np
 import networkx as nx
+import math
+from collections import defaultdict
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -37,7 +39,7 @@ class OutputGenerator:
         return all_experiments_data
     
 
-    def extract_metrics(self, stat_power_measure = 'absolute_error', trait_of_interest='Gender'):
+    def extract_metrics(self, stat_power_measure = 'absolute_error', trait_of_interest='Gender', target_entropy=True):
         data =[]
 
         for folder, experiment in self.experiment_data.items(): #for cohort in cohort batch
@@ -58,10 +60,12 @@ class OutputGenerator:
                 group_id_within_cohort = group.group_id - 1 #TODO: check if this indexing is right (now reduced by 1 bcz groups start at 1, not 0)
                 group_absolute_error = measure_dict[group_id_within_cohort] 
 
+                trait_entropy_value = trait_entropy if target_entropy is True else group.real_entropy #choose between target and real entropy of the group
+
                 # Append extracted data to the list
                 data.append({
                     "weight_entropy": weight_entropy,  # X-axis
-                    "trait_entropy": trait_entropy,  # Y-axis
+                    "trait_entropy": trait_entropy_value,  # Y-axis
                     "stat_power": group_absolute_error,  # Z-axis
                     "group": group,  # The Group Object
                     "recovered_weights_df": recovered_weights_df, # The recovered weights DataFrame
@@ -79,12 +83,12 @@ class OutputGenerator:
         return shannon_entropy
 
 
-    def plot_3d(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error"): #TODO: remove once interactive plot is ready (run_3d_visualization())
+    def plot_3d(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error", target_entropy=True): #TODO: remove once interactive plot is ready (run_3d_visualization())
         """
         Create a 3D scatter plot using the extracted data.
         !Non-interactive!
         """
-        data = self.extract_metrics(trait_of_interest=trait_of_interest)
+        data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
 
@@ -111,82 +115,19 @@ class OutputGenerator:
         plt.show()
 
 
-    def plot_heatmap(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", cmap="viridis",vmin=None, vmax=None, annotate=False, fmt=".2f", figsize=(6, 5)):
-        """
-        Heatmap where color encodes per-group absolute error.
-        X = weight entropy, Y = trait entropy, Color = 'absolute_error' for the chosen trait.
-        """
-        data = self.extract_metrics(trait_of_interest=trait_of_interest)
-
-        # Collect unique axis values
-        x_vals = sorted(set(d["weight_entropy"] for d in data))
-        y_vals = sorted(set(d["trait_entropy"]  for d in data))
-
-        # Map (x,y) -> list of z to allow averaging if duplicates exist
-        cell = {}
-        for d in data:
-            key = (d["weight_entropy"], d["trait_entropy"])
-            cell.setdefault(key, []).append(d["stat_power"])
-        
-
-        # Build grid [rows=y, cols=x]
-        grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
-        for i, y in enumerate(y_vals):
-            for j, x in enumerate(x_vals):
-                if (x, y) in cell:
-                    zs = cell[(x, y)]
-                    grid[i, j] = float(np.mean(zs))  # mean if multiple
-
-        # Plot
-        fig, ax = plt.subplots(figsize=figsize)
-        im = ax.imshow(
-            grid,
-            origin="lower",
-            aspect="auto",
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax,
-        )
-
-        # Ticks show the actual x/y values
-        ax.set_xticks(np.arange(len(x_vals)))
-        ax.set_yticks(np.arange(len(y_vals)))
-        ax.set_xticklabels([f"{v:.2f}" for v in x_vals], rotation=45, ha="right")
-        ax.set_yticklabels([f"{v:.2f}" for v in y_vals])
-
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        ax.set_title("Heatmap of Group Metrics")
-
-        # Colorbar label: "Absolute error (Trait)"
-        cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label(f"Absolute error ({trait_of_interest})")
-
-        # Optional cell annotations
-        if annotate:
-            for i in range(len(y_vals)):
-                for j in range(len(x_vals)):
-                    val = grid[i, j]
-                    if not np.isnan(val):
-                        ax.text(j, i, format(val, fmt), ha="center", va="center", fontsize=8)
-
-        fig.tight_layout()
-        plt.show()
-
-
-    def plot_heatmaps(self, traits, x_label="Weight Entropy", y_label="Trait Entropy", cmap="viridis", vmin=None, vmax=None, annotate=False, fmt=".2f", figsize_per_plot=(5, 4), round_decimals=None, share_scale=True):
-        """
-        Draw side-by-side heatmaps for multiple traits.
-        X = weight entropy, Y = trait entropy, Color = absolute error (max of duplicates).
-        """
-
+    def plot_heatmaps(
+        self, traits, x_label="Weight Entropy", y_label="Trait Entropy",
+        target_entropy=True, cmap="viridis", vmin=None, vmax=None,
+        annotate=False, fmt=".2f", figsize_per_plot=(5, 4),
+        round_decimals=3, share_scale=True
+    ):
         traits = list(traits)
         per_trait_cells = []
         all_x, all_y = set(), set()
 
         # Collect data for all traits
         for trait in traits:
-            data = self.extract_metrics(trait_of_interest=trait)
+            data = self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy)
             cell = {}
             for d in data:
                 x = d["weight_entropy"]
@@ -211,7 +152,7 @@ class OutputGenerator:
                 for j, x in enumerate(x_vals):
                     zs = cell.get((x, y))
                     if zs:
-                        grid[i, j] = float(np.mean(zs))  # <- use max for duplicates
+                        grid[i, j] = float(np.mean(zs))
             grids.append((trait, grid))
 
         # Shared color scale if desired
@@ -224,21 +165,26 @@ class OutputGenerator:
 
         # Plotting
         n = len(traits)
-        fig, axes = plt.subplots(1, n, figsize=(figsize_per_plot[0]*n, figsize_per_plot[1]), squeeze=False)
+        fig, axes = plt.subplots(
+            1, n, figsize=(figsize_per_plot[0]*n + 1.5, figsize_per_plot[1]),  # Add space for colorbar
+            squeeze=False,
+        )
         axes = axes[0]
 
         ims = []
-        for ax, (trait, grid) in zip(axes, grids):
+        for i, (ax, (trait, grid)) in enumerate(zip(axes, grids)):
             im = ax.imshow(grid, origin="lower", aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax)
             ims.append(im)
 
             ax.set_xticks(np.arange(len(x_vals)))
             ax.set_yticks(np.arange(len(y_vals)))
-            ax.set_xticklabels([f"{v:.2f}" if isinstance(v, float) else str(v) for v in x_vals], rotation=45, ha="right")
-            ax.set_yticklabels([f"{v:.2f}" if isinstance(v, float) else str(v) for v in y_vals])
+            ax.set_xticklabels([f"{v:.2f}" for v in x_vals], rotation=45, ha="right")
+            ax.set_yticklabels([f"{v:.2f}" for v in y_vals])
 
             ax.set_xlabel(x_label)
-            ax.set_ylabel(y_label)
+            if i == 0:
+                ax.set_ylabel(y_label)
+
             ax.set_title(f"Absolute error ({trait.replace('_', ' ')})")
 
             if annotate:
@@ -248,19 +194,114 @@ class OutputGenerator:
                         if not np.isnan(val):
                             ax.text(j, i, format(val, fmt), ha="center", va="center", fontsize=8)
 
-        # Shared colorbar
-        cbar = fig.colorbar(ims[0], ax=axes.tolist(), fraction=0.046, pad=0.08)
+        # Add shared colorbar to the right
+        fig.subplots_adjust(right=0.88)  # Leave space for colorbar
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])  # Manual placement
+        cbar = fig.colorbar(ims[0], cax=cbar_ax)
         cbar.set_label("Absolute error")
 
-        # fig.tight_layout(rect=[0, 0, 0.93, 1])
+        # Ensure x-axis labels are not cut off
+        plt.tight_layout(rect=[0, 0, 0.88, 1])
+
         plt.show()
         return fig, axes
 
 
-    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender'):
+    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
         """Runs the interactive 3D plot in the browser"""
         #capitalize strip
         z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
-        data = self.extract_metrics(trait_of_interest=trait_of_interest)
+        data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
         visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
         visualizer.run()
+
+
+
+    def _weights_match(self, w_a: dict, w_b: dict, tol: float = 1e-9) -> bool:
+        """Return True if two weight dicts match within tolerance (keys + values)."""
+        if set(w_a.keys()) != set(w_b.keys()):
+            return False
+        for k in w_a.keys():
+            if not math.isclose(float(w_a[k]), float(w_b[k]), rel_tol=0, abs_tol=tol):
+                return False
+        return True
+
+    def _make_uniform_weights_like(self, template_weights: dict) -> dict:
+        """Build a uniform weight dict over the same keys as template_weights."""
+        n = len(template_weights)
+        if n == 0:
+            return {}
+        val = 1.0 / n
+        return {k: val for k in template_weights.keys()}
+
+
+    def plot_real_entropy_boxplots(self, weight_choice=None, tol=1e-9, figsize=(7,4), title="Realized group entropies by target entropy (single weight choice)", savepath=None, show=True):
+        """
+        Make boxplots of realized group entropies (group.real_entropy) for each target_entropy,
+        restricted to experiments that used a chosen weight vector.
+
+        Parameters
+        ----------
+        weight_choice : dict or None
+            Weight dict to filter experiments on (e.g., {'Age': 1/3, 'Gender': 1/3, 'Edu': 1/3}).
+            If None, a uniform dict over the first experiment's weight keys is used.
+        tol : float
+            Tolerance for matching base_weights to `weight_choice`. Default 1e-9.
+        figsize : tuple
+            Matplotlib figure size (width, height). Default (7, 4).
+        title : str or None
+            Title for the plot. Use None for no title.
+        savepath : str or None
+            If given, saves the figure to this path (e.g. 'out/boxplots.png').
+        show : bool
+            If True, displays the plot with plt.show().
+        """
+        def weights_match(w_a, w_b):
+            if set(w_a.keys()) != set(w_b.keys()):
+                return False
+            return all(abs(float(w_a[k]) - float(w_b[k])) <= tol for k in w_a)
+
+        # default: uniform weights over first experiment keys
+        if weight_choice is None:
+            for exp in self.experiment_data.values():
+                keys = list(exp['params']['base_weights'].keys())
+                if keys:
+                    val = 1.0 / len(keys)
+                    weight_choice = {k: val for k in keys}
+                    break
+
+        buckets = defaultdict(list)
+
+        for exp in self.experiment_data.values():
+            base_w = exp['params']['base_weights']
+            if not weights_match(base_w, weight_choice):
+                continue
+
+            target_ent = float(exp['params']['target_entropy'])
+            for g in exp.get("groups", []) or []:
+                if hasattr(g, "real_entropy") and g.real_entropy is not None:
+                    buckets[target_ent].append(float(g.real_entropy))
+
+        if not buckets:
+            print("No matching experiments found for chosen weight vector.")
+            return None, None
+
+        target_vals = sorted(buckets.keys())
+        data = [buckets[t] for t in target_vals]
+
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.boxplot(data, labels=[f"{t:.2f}" for t in target_vals])
+        ax.set_xlabel("Target Entropy")
+        ax.set_ylabel("Realized Group Entropy")
+        if title:
+            ax.set_title(title)
+        ax.grid(True, axis="y", linestyle="--", alpha=0.4)
+
+        plt.tight_layout()
+        if savepath:
+            fig.savefig(savepath, dpi=200, bbox_inches="tight")
+        if show:
+            plt.show()
+
+        return fig, ax
+

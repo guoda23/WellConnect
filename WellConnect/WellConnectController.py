@@ -12,19 +12,17 @@ from OutputGenerator import OutputGenerator
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 class WellConnectController:
-    def __init__(self, data_path, group_size, attributes, max_distances, weights, file_type = 'csv'):
+    def __init__(self, data_path, group_size, attributes, max_distances, file_type = 'csv'):
         self.data_handler = DataHandler(data_path, file_type=file_type)
 
         self.population_data = self.data_handler.read_data()
         self.group_size = group_size
         self.attributes = attributes #TODO: automate this? maybe good to keep separate for subsetting traits
         self.max_distances = max_distances #TODO" automate this
-        self.weights = weights 
         self.agents = self.data_handler.create_agents(self.population_data, self.attributes)
         
-        
-        self.connection_predictor = ConnectionPredictor(weights=self.weights, max_distances=self.max_distances)
         #modules instantiated later
+        self.connection_predictor = None
         self.group_creator = None 
         self.regression_runner = None
         self.statistical_power_calculator = None
@@ -55,37 +53,37 @@ class WellConnectController:
             )
         else:
             raise ValueError("Unknown strategy: Choose 'random', 'trait_based', or 'entropy_controlled'")
-        
+    
 
-    def run(self, strategy, mode = 'synthetic data', **kwargs):
-        self.display_population_data() #test the data loading
-
-        #create groups
+    def create_groups(self, strategy, **kwargs):
         self.set_group_creation_strategy(strategy, **kwargs)
         groups = self.group_creator.create_groups()
-        # print("Created Groups:", groups)
+        return groups
+    
+
+    def run_on_groups(self, groups, weights, mode = 'synthetic data', **kwargs):
+        self.connection_predictor = ConnectionPredictor(weights=weights, max_distances=self.max_distances)
 
         for group in groups:
             group.create_group_graph() #create group graphs
-
             #run the social connection predictions (update graphs with weights)
             self.connection_predictor.predict_weights(group.network)
             
 
         #run linear regression
-        self.regression_runner = RegressionRunner(attributes=list(self.weights.keys()), max_distances=self.max_distances)
+        self.regression_runner = RegressionRunner(attributes=list(weights.keys()), max_distances=self.max_distances)
         recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups)
         
         if mode == 'synthetic data':
-            self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=self.weights)
+            self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=weights)
         elif mode == 'real data':
             self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=None)
 
-        return groups, recovered_weights_df  #TODO: put into an storage file -> save_experiment_data()
+        return recovered_weights_df  #put into a storage file by save_experiment_data()
 
 
-    def statistical_power_analysis(self, traits_of_interest, recovered_weights_df):
-        self.statistical_power_calculator = StatisticalPowerCalculator(recovered_weights_df=recovered_weights_df, true_weights=self.weights)
+    def statistical_power_analysis(self, traits_of_interest, recovered_weights_df, weights):
+        self.statistical_power_calculator = StatisticalPowerCalculator(recovered_weights_df=recovered_weights_df, true_weights=weights)
         measure_dict = self.statistical_power_calculator.evaluate_predictive_power(attributes=traits_of_interest)
         return measure_dict
     
@@ -100,7 +98,7 @@ class WellConnectController:
             "groups": groups,
             "recovered_weights_df": recovered_weights_df,
             "params": params,
-            "measure_dict": measure_dict,
+            "measure_dict": measure_dict, #indexed by a trait of interest first
             "timestamp": timestamp
         }
 

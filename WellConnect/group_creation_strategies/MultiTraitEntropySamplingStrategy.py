@@ -10,7 +10,7 @@ from group_creation_strategies.GroupCreationStrategy import GroupCreationStrateg
 class MultiTraitEntropySamplingStrategy(GroupCreationStrategy): 
     def __init__(self, agents, group_size, target_entropy, traits, tolerance, num_groups=None, seed=None):
         """
-        Initializes the entropy-controlled sampling strategy (for joint entroy of traits).
+        Initializes the entropy-controlled sampling strategy (for joint entropy of traits).
 
         Parameters:
         - agents (list[Agent]): The dataset containing Agent objects.
@@ -27,12 +27,14 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         self.tolerance = tolerance
 
         if seed is not None:
-            random.seed(seed)
+            self.rng = random.Random(seed)
+        else:
+            self.rng = random.Random()
 
 
     def create_groups(self): #TODO: potentially make more efficient
         """
-        Create groups while controlling entropy based on the specified trait.
+        Create groups while controlling entropy based on the specified trait (greedy - best local choice)
 
         Returns:
         - list[Group]: A list of Group objects.
@@ -48,10 +50,6 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
             while len(group_members) < self.group_size:
                 if group_members:
                     current_entropy = self.calculate_joint_entropy(group_members)
-            
-                # Stop if target entropy is achieved and group is full
-                if self.should_stop_group_formation(group_members, current_entropy):
-                    break
 
                 # Candidate selection
                 candidate = self.select_best_candidate(available_agents, group_members)
@@ -61,12 +59,12 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
                     available_agents.remove(candidate)
             
             group = Group(group_id=group_id, members=group_members)
+            #update real entropy after group is filled
+            group.real_entropy = self.calculate_joint_entropy(group_members)
             groups.append(group)
-                
-            if not available_agents:
-                break
 
         return groups
+
 
 
     def calculate_joint_entropy(self, group_members):
@@ -76,7 +74,7 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         Parameters:
         - group_members (list[Agent]): Members of the current group.
         
-        Returns:
+        Returns:should_stop
         - float: Joint entropy value.
         """
         
@@ -88,7 +86,7 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         return entropy(probabilities, base=2) 
     
 
-    def should_stop_group_formation(self, group_members, current_entropy):
+    def should_stop_group_formation(self, group_members, current_entropy): #TODO:remove together with tolerance
         """
         Checks if group formation should stop based on entropy and group size.
 
