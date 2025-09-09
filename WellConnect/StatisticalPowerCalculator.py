@@ -44,7 +44,7 @@ class StatisticalPowerCalculator:
         return total_differences_per_group
     
 
-    def absolute_error(self, attribute, NaN_penalty=10):
+    def absolute_error(self, attribute, NaN_penalty=2):
         errors_per_group = {}
 
         for group_id, row in self.recovered_weights_df.iterrows():

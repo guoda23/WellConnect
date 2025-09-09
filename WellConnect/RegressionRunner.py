@@ -31,7 +31,7 @@ class RegressionRunner:
                 max_attribute_distance = self.max_distances[attr]
 
                 # Absolute differences for continuous attributes
-                if isinstance(value1, (int, float)) and isinstance(value2, (int, float)): #TODO: add handling o NA values
+                if isinstance(value1, (int, float)) and isinstance(value2, (int, float)):
                     absolute_distance = abs(value1 - value2)
                     normalized_distance = absolute_distance / max_attribute_distance
                     row[attr] = - normalized_distance
