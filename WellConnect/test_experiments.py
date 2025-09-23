@@ -122,6 +122,11 @@ GROUP_FORMATION = "multi-trait-entropy"
 ENTROPY_TOL = float('inf')
 TRAITS_OF_INTEREST =  ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
 HOMOPHILY_FUNCTION_NAME = "linear_deterministic"  #or "linear_stochastic"
+REGRESSION_TYPE = "constrained"  #or "unconstrained"
+DROP_LAST_VAR = False # trop drop last variable in regression (to prevent collinearity) and reconstruct its weight
+DROP_VAR = None #to drop a specific variable and reconstruct its weight (to prevent collinearity)
+# NAN_PENALTY = 1.0
+# ABNORMALITY_PENALTY = 1.0
 
 params = {
     'max_distances': MAX_DISTANCES,
@@ -132,7 +137,14 @@ params = {
     'group_formation': GROUP_FORMATION,
     'entropy_tol': ENTROPY_TOL,
     'traits_of_interest': TRAITS_OF_INTEREST,
-    'homophily_function': HOMOPHILY_FUNCTION_NAME
+    'homophily_function': HOMOPHILY_FUNCTION_NAME,
+    #regression related params
+    'regression_type': REGRESSION_TYPE,
+    'drop_last_var': DROP_LAST_VAR,
+    'drop_var': DROP_VAR,
+    #TODO: add penalties dynamically
+    # 'NaN_penalty': NAN_PENALTY,
+    # 'Abnormality_penalty': ABNORMALITY_PENALTY,
 }
 
 # ───────────────────────────────────────────
@@ -169,7 +181,10 @@ for target_entropy in TARGET_ENTROPY_LIST:
         recovered_weights_df = controller.run_on_groups(
             groups=groups,
             weights=base_weights,
-            homophily_function_name=HOMOPHILY_FUNCTION_NAME
+            homophily_function_name=HOMOPHILY_FUNCTION_NAME,
+            drop_last_var=DROP_LAST_VAR,
+            drop_var=DROP_VAR,
+            regression_type=REGRESSION_TYPE
         )
 
         measure_dict = controller.statistical_power_analysis(

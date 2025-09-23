@@ -1,13 +1,13 @@
 from homophily_functions import HOMOPHILY_FUNCTIONS
 
 class ConnectionPredictor:
-    def __init__(self, weights, max_distances, homophily_function_name = 'linear'):
+    def __init__(self, weights, max_distances, homophily_function_name = 'linear_deterministic'):
         """
         Initializes the ConnectionPredictor.
 
         Parameters:
         - homophily_function_name (str, optional): Name of the homophily function to use.
-          Defaults to "linear".
+          Defaults to "linear_deterministic".
         - weights (dict): Weights for attributes.
         - max_distances (dict): Maximum distances within attributes for normalization.
         """

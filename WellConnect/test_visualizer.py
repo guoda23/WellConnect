@@ -2,7 +2,7 @@ from OutputGenerator import OutputGenerator
 
 
 # output_gen = OutputGenerator("Experiment_data/batch_2025-09-12_12-03-09")
-output_gen = OutputGenerator("Experiment_data/batch_2025-09-22_10-35-52")
+output_gen = OutputGenerator("Experiment_data/batch_2025-09-23_17-30-54")
 
 
 output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True)

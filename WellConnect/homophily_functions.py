@@ -1,6 +1,6 @@
 import numpy as np
 
-def linear_homophily_function(agent1, agent2, weights, max_distances): #TODO: incorporate euclidean distance?
+def linear_deterministic_homophily_function(agent1, agent2, weights, max_distances): #TODO: incorporate euclidean distance?
     """
     Calculates the homophily score (e.g., tie strength between two individuals based on their trait compatibility).
 
@@ -40,7 +40,7 @@ def linear_homophily_function(agent1, agent2, weights, max_distances): #TODO: in
     return round(score, 2)
     
 
-def stochastic_linear_homophily_function(agent1, agent2, weights, max_distances, noise_std=0.2): #TODO: incorporate euclidean distance?
+def linear_stochastic_homophily_function(agent1, agent2, weights, max_distances, noise_std=0.2): #TODO: incorporate euclidean distance?
     """
     Calculates the homophily score with Gaussian noise perturbation.
 
@@ -89,6 +89,6 @@ def stochastic_linear_homophily_function(agent1, agent2, weights, max_distances,
 
 #Function registry
 HOMOPHILY_FUNCTIONS = {
-    "linear_deterministic": linear_homophily_function,
-    "linear_stochastic": stochastic_linear_homophily_function
+    "linear_deterministic": linear_deterministic_homophily_function,
+    "linear_stochastic": linear_stochastic_homophily_function
 }

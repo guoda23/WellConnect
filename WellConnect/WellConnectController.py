@@ -61,7 +61,7 @@ class WellConnectController:
         return groups
     
 
-    def run_on_groups(self, groups,  homophily_function_name, weights, mode = 'synthetic data', **kwargs):
+    def run_on_groups(self, groups,  homophily_function_name, weights, drop_last_var, drop_var, regression_type, mode = 'synthetic data', **kwargs):
         self.connection_predictor = ConnectionPredictor(weights=weights, max_distances=self.max_distances, homophily_function_name=homophily_function_name)
 
         for group in groups:
@@ -70,11 +70,9 @@ class WellConnectController:
             self.connection_predictor.predict_weights(group.network)
             
 
-        #run linear regression
-        self.regression_runner = RegressionRunner(attributes=list(weights.keys()), max_distances=self.max_distances)
-        # recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups)
-        # recovered_weights_df = self.regression_runner.perform_group_regression_constrained(groups=groups)
-        recovered_weights_df = self.regression_runner.perform_group_regression_scipy(groups=groups)
+        #run regression
+        self.regression_runner = RegressionRunner(attributes=list(weights.keys()), max_distances=self.max_distances, regression_type=regression_type)
+        recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups, drop_last_var=drop_last_var, drop_var=drop_var)
 
         if mode == 'synthetic data':
             self.regression_runner.display_results(recovered_weights_df=recovered_weights_df, true_weights=weights)
