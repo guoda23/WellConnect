@@ -1,11 +1,12 @@
 import os
 from datetime import datetime
 from WellConnectController import WellConnectController
+import numpy as np
 
 #NB: this test script is linked to 'Experiment_data' folder
 
 BASE_WEIGHTS_LIST = [
-    # 0.1 grid triples
+    # 0.1 grid triplesf
     {'Age_tertiary': 1.0, 'EducationLevel_tertiary': 0.0, 'Gender_tertiary': 0.0},
     {'Age_tertiary': 0.9, 'EducationLevel_tertiary': 0.1, 'Gender_tertiary': 0.0},
     {'Age_tertiary': 0.9, 'EducationLevel_tertiary': 0.0, 'Gender_tertiary': 0.1},
@@ -97,8 +98,14 @@ BASE_WEIGHTS_LIST = [
 
 # TARGET_ENTROPY_LIST = [0.00, 0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
 # TARGET_ENTROPY_LIST = [0.00, 0.1, 0.20, 0.30, 0.40, 0.50, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-TARGET_ENTROPY_LIST = [0.00, 0.50, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+# TARGET_ENTROPY_LIST = [0.00, 0.50, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+# TARGET_ENTROPY_LIST = np.round(np.linspace(0.0, 3.32, num=30), 2)
 
+#all value combinations
+# TARGET_ENTROPY_LIST = [0.0, 0.469, 0.7219, 0.8813, 0.9219, 0.971, 1.0, 1.1568, 1.2955, 1.3568, 1.361, 1.371, 1.4855, 1.5219, 1.571, 1.6855, 1.7219, 1.761, 1.771, 1.8464, 1.8955, 1.9219, 1.961, 1.971, 2.0464, 2.1219, 2.161, 2.171, 2.2464, 2.3219, 2.371, 2.4464, 2.5219, 2.6464, 2.7219, 2.8464, 2.9219, 3.1219, 3.3219]
+
+#shortened list of all value combinations
+TARGET_ENTROPY_LIST = [0.0, 0.469, 0.7219, 0.8813, 0.971, 1.0, 1.1568, 1.3568, 1.361, 1.371, 1.5219, 1.571, 1.6855, 1.7219, 1.771, 1.8464, 1.961, 1.971, 2.0464,2.2464, 2.4464, 2.5219, 2.9219, 3.1219, 3.3219]
 
 MAX_DISTANCES = {
     'Age_tertiary': 1,
@@ -108,12 +115,13 @@ MAX_DISTANCES = {
 
 ATTRIBUTES = ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
             #   'PHQ9_Total', 'PANCRS_TotalPositive', 'PANCRS_TotalNegative', 'PANCRS_FrequencyPositive', 'PANCRS_FrequencyNegative']
-SEED = 123
+SEED = 20
 GROUP_SIZE = 10
 NUM_GROUPS = 8
 GROUP_FORMATION = "multi-trait-entropy"
 ENTROPY_TOL = float('inf')
 TRAITS_OF_INTEREST =  ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
+HOMOPHILY_FUNCTION_NAME = "linear_deterministic"  #or "linear_stochastic"
 
 params = {
     'max_distances': MAX_DISTANCES,
@@ -123,7 +131,8 @@ params = {
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
     'entropy_tol': ENTROPY_TOL,
-    'traits_of_interest': TRAITS_OF_INTEREST
+    'traits_of_interest': TRAITS_OF_INTEREST,
+    'homophily_function': HOMOPHILY_FUNCTION_NAME
 }
 
 # ───────────────────────────────────────────
@@ -159,7 +168,8 @@ for target_entropy in TARGET_ENTROPY_LIST:
     for base_weights in BASE_WEIGHTS_LIST:
         recovered_weights_df = controller.run_on_groups(
             groups=groups,
-            weights=base_weights
+            weights=base_weights,
+            homophily_function_name=HOMOPHILY_FUNCTION_NAME
         )
 
         measure_dict = controller.statistical_power_analysis(

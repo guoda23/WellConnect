@@ -25,7 +25,7 @@ class StatisticalPowerCalculator:
         self.confidence_level = confidence_level
 
 
-    def combined_absolute_error(self, NaN_penalty = 1):
+    def combined_absolute_error(self, NaN_penalty = 1, NaN_penalty_anomaly=1):
         total_differences_per_group = {}
         
         for group_id, row in self.recovered_weights_df.iterrows():
@@ -36,6 +36,8 @@ class StatisticalPowerCalculator:
 
                 if pd.isna(recovered_value):
                     group_difference += NaN_penalty
+                elif recovered_value < 0 or recovered_value > 1:
+                    group_difference += NaN_penalty_anomaly
                 else:
                     group_difference += abs(recovered_value - true_value)
         
@@ -44,7 +46,7 @@ class StatisticalPowerCalculator:
         return total_differences_per_group
     
 
-    def absolute_error(self, attribute, NaN_penalty=2):
+    def absolute_error(self, attribute, NaN_penalty=1, NaN_penalty_anomaly=1):
         errors_per_group = {}
 
         for group_id, row in self.recovered_weights_df.iterrows():
@@ -53,6 +55,8 @@ class StatisticalPowerCalculator:
 
             if pd.isna(recovered_value):
                 errors_per_group[group_id] = NaN_penalty
+            elif recovered_value < 0 or recovered_value > 1:
+                errors_per_group[group_id] = NaN_penalty_anomaly
             else:
                 errors_per_group[group_id] = abs(recovered_value - true_value)
 

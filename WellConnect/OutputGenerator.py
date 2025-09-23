@@ -1,12 +1,15 @@
 import os
 import pickle
 import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.stats import entropy
 import numpy as np
 import networkx as nx
 import math
 from collections import defaultdict
+import re
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -118,56 +121,87 @@ class OutputGenerator:
     def plot_heatmaps(
         self, traits, x_label="Weight Entropy", y_label="Trait Entropy",
         target_entropy=True, cmap="viridis", vmin=None, vmax=None,
-        annotate=False, fmt=".2f", figsize_per_plot=(5, 4),
-        round_decimals=3, share_scale=True
+        annotate=False, fmt=".3f", figsize_per_plot=(5, 4),
+        share_scale=True, snap_decimals=6, tick_decimals=3
     ):
+        # Calm, consistent font sizes
+        plt.rcParams.update({
+            "axes.titlesize": 14,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "figure.titlesize": 18
+        })
+
+        def snap(v, d=snap_decimals):
+            # snap to a python float (not numpy scalar) to avoid set/sort surprises
+            return float(np.round(float(v), d))
+
         traits = list(traits)
-        per_trait_cells = []
+
+        # First pass: collect snapped X/Y across ALL traits so subplots share axes
         all_x, all_y = set(), set()
+        per_trait_df = []  # store (trait, df) pairs so we don't recompute
 
-        # Collect data for all traits
         for trait in traits:
-            data = self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy)
-            cell = {}
-            for d in data:
-                x = d["weight_entropy"]
-                y = d["trait_entropy"]
-                if round_decimals is not None:
-                    x = round(float(x), round_decimals)
-                    y = round(float(y), round_decimals)
-                key = (x, y)
-                cell.setdefault(key, []).append(d["stat_power"])
-            per_trait_cells.append((trait, cell))
-            for (x, y) in cell.keys():
-                all_x.add(x); all_y.add(y)
+            rows = []
+            for d in self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy):
+                rows.append({
+                    "x": snap(d["weight_entropy"]),
+                    "y": snap(d["trait_entropy"]),
+                    "z": float(d["stat_power"])
+                })
+            df = pd.DataFrame(rows)
+            if df.empty:
+                # keep an empty df; we'll handle it below
+                per_trait_df.append((trait, df))
+                continue
 
+            # Update global axes sets
+            all_x.update(df["x"].unique().tolist())
+            all_y.update(df["y"].unique().tolist())
+            per_trait_df.append((trait, df))
+
+        # If nothing to plot, bail gracefully
+        if not all_x or not all_y:
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.text(0.5, 0.5, "No data to plot", ha="center", va="center")
+            ax.axis("off")
+            plt.show()
+            return fig, [ax]
+
+        # Shared sorted axis values (snapped)
         x_vals = sorted(all_x)
         y_vals = sorted(all_y)
 
-        # Build grids per trait
+        # Build one grid per trait (pivot + reindex to shared axes)
         grids = []
-        for trait, cell in per_trait_cells:
-            grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
-            for i, y in enumerate(y_vals):
-                for j, x in enumerate(x_vals):
-                    zs = cell.get((x, y))
-                    if zs:
-                        grid[i, j] = float(np.mean(zs))
+        for trait, df in per_trait_df:
+            if df.empty:
+                grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
+            else:
+                # average duplicates of the same (x,y)
+                dfg = df.groupby(["y", "x"], as_index=False)["z"].mean()
+                pivot = dfg.pivot(index="y", columns="x", values="z")
+
+                # ensure full rectangular grid across shared axes
+                pivot = pivot.reindex(index=y_vals, columns=x_vals)
+                grid = pivot.to_numpy(dtype=float)
             grids.append((trait, grid))
 
         # Shared color scale if desired
         if (vmin is None or vmax is None) and share_scale:
             stacked = np.concatenate([g[1].ravel() for g in grids])
             stacked = stacked[~np.isnan(stacked)]
-            if stacked.size > 0:
+            if stacked.size:
                 if vmin is None: vmin = float(np.nanmin(stacked))
                 if vmax is None: vmax = float(np.nanmax(stacked))
 
         # Plotting
         n = len(traits)
         fig, axes = plt.subplots(
-            1, n, figsize=(figsize_per_plot[0]*n + 1.5, figsize_per_plot[1]),  # Add space for colorbar
-            squeeze=False,
+            1, n, figsize=(figsize_per_plot[0]*n + 1.5, figsize_per_plot[1]),
+            squeeze=False
         )
         axes = axes[0]
 
@@ -178,33 +212,36 @@ class OutputGenerator:
 
             ax.set_xticks(np.arange(len(x_vals)))
             ax.set_yticks(np.arange(len(y_vals)))
-            ax.set_xticklabels([f"{v:.2f}" for v in x_vals], rotation=45, ha="right")
-            ax.set_yticklabels([f"{v:.2f}" for v in y_vals])
+            ax.set_xticklabels([f"{v:.{tick_decimals}f}" for v in x_vals], rotation=45, ha="right")
+            ax.set_yticklabels([f"{v:.{tick_decimals}f}" for v in y_vals])
 
             ax.set_xlabel(x_label)
             if i == 0:
                 ax.set_ylabel(y_label)
 
-            ax.set_title(f"Absolute error ({trait.replace('_', ' ')})")
+            # Clean trait title: cut at '_' and split CamelCase ("EducationLevel" -> "Education Level")
+            pretty = trait.split("_")[0]
+            pretty = re.sub(r'(?<!^)(?=[A-Z])', ' ', pretty)
+            ax.set_title(f"Absolute error: {pretty}")
 
             if annotate:
-                for i in range(len(y_vals)):
-                    for j in range(len(x_vals)):
-                        val = grid[i, j]
+                for r in range(len(y_vals)):
+                    for c in range(len(x_vals)):
+                        val = grid[r, c]
                         if not np.isnan(val):
-                            ax.text(j, i, format(val, fmt), ha="center", va="center", fontsize=8)
+                            ax.text(c, r, format(val, fmt), ha="center", va="center")
 
-        # Add shared colorbar to the right
-        fig.subplots_adjust(right=0.88)  # Leave space for colorbar
-        cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])  # Manual placement
+        # Shared colorbar on the right
+        fig.subplots_adjust(right=0.88)
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
         cbar = fig.colorbar(ims[0], cax=cbar_ax)
-        cbar.set_label("Absolute error")
+        # no label: cbar.set_label("")
 
-        # Ensure x-axis labels are not cut off
+        fig.suptitle("Absolute Error of Regression Coefficients Across Weight and Trait Entropy")
         plt.tight_layout(rect=[0, 0, 0.88, 1])
-
         plt.show()
         return fig, axes
+
 
 
     def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
@@ -304,4 +341,39 @@ class OutputGenerator:
             plt.show()
 
         return fig, ax
+    
+
+    def plot_trait_histograms(self, traits, csv_path="data/preprocessed.csv"):
+        """
+        Plots histograms for selected traits from the preprocessed dataset.
+
+        Parameters:
+            traits (list[str]): List of trait/column names to plot.
+            csv_path (str): Path to the preprocessed dataset (default: 'data/preprocessed.csv').
+        """
+        # Load dataset
+        df = pd.read_csv(csv_path)
+
+        num_traits = len(traits)
+        fig, axes = plt.subplots(1, num_traits, figsize=(5 * num_traits, 4), sharey=False)
+
+        if num_traits == 1:
+            axes = [axes]  # make iterable if only one plot
+
+        for ax, trait in zip(axes, traits):
+            if trait not in df.columns:
+                ax.set_visible(False)
+                continue
+
+            if pd.api.types.is_numeric_dtype(df[trait]):
+                sns.histplot(df[trait], kde=False, bins=10, ax=ax, color="#7E57C2")
+            else:
+                df[trait].value_counts().plot(kind="bar", ax=ax, color="#81C784")
+
+            ax.set_title(f"Distribution of {trait}")
+            ax.set_xlabel(trait)
+            ax.set_ylabel("Count")
+
+        plt.tight_layout()
+        plt.show()
 
