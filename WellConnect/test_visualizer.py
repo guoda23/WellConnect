@@ -1,8 +1,8 @@
 from OutputGenerator import OutputGenerator
 
 
-# output_gen = OutputGenerator("Experiment_data/batch_2025-09-12_12-03-09")
-output_gen = OutputGenerator("Experiment_data/batch_2025-09-25_12-27-22")
+# output_gen = OutputGenerator("Experiment_data/batch_2025-09-25_15-05-11")
+output_gen = OutputGenerator("Experiments/homophily_function_retrievability/deterministic/batch_2025-09-25_15-05-11")
 
 
 output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True)

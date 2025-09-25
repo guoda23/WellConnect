@@ -1,3 +1,5 @@
+#Deprecated - see Scripts/experiments_homophily_function_retrieval.py for the updated version
+
 import os
 from datetime import datetime
 from WellConnectController import WellConnectController

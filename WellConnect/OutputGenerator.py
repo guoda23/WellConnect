@@ -23,57 +23,69 @@ class OutputGenerator:
     def _load_experiment_data(self):
         all_experiments_data = {}
 
-        for folder in os.listdir(self.batch_folder): #loop over subfolders in the batch
-            folder_path = os.path.join(self.batch_folder, folder)
-            if os.path.isdir(folder_path): #ensure a subfolder (e.g. "experiment_run_1")
-                # print(f"Found folder: {folder}") 
+        # Recursively walk all subfolders (seed_x/experiment_run_y/)
+        for root, _, files in os.walk(self.batch_folder):
+            for file in files:
+                if file.endswith(".pkl"):
+                    filepath = os.path.join(root, file)
+                    with open(filepath, "rb") as f:
+                        experiment_data = pickle.load(f)
+                        all_experiments_data[filepath] = experiment_data
 
-                #load experiment data from pickle file
-                for file in os.listdir(folder_path):
-                    if file.endswith(".pkl"):
-                        filepath = os.path.join(folder_path, file)
-                        # print(f"Loading data from: {filepath}")
-
-                        with open(filepath, "rb") as f:
-                            experiment_data = pickle.load(f) #load one file
-                            all_experiments_data[filepath] = experiment_data #store in main dict
-        
-        # print(f"Total experiments loaded: {len(all_experiments_data)}")
         return all_experiments_data
+
     
 
-    def extract_metrics(self, stat_power_measure = 'absolute_error', trait_of_interest='Gender', target_entropy=True):
-        data =[]
+    def extract_metrics(self, trait_of_interest, stat_power_measure='absolute_error', target_entropy=True, seeds=None):
+        """
+        Extract metrics from experiment data.
 
-        for folder, experiment in self.experiment_data.items(): #for cohort in cohort batch
-            #extracting aggregate variables for the entire cohort
-            trait_entropy = experiment['params']['target_entropy'] 
+        Parameters
+        ----------
+        stat_power_measure : str
+            The metric to extract (default: 'absolute_error').
+        trait_of_interest : str
+            Trait to focus on (default: 'Gender').
+        target_entropy : bool
+            Whether to use target or realized group entropy.
+        seeds : list[int] or None
+            If given, only include experiments from these seeds.
+            If None, include all seeds.
 
+        Returns
+        -------
+        list[dict]
+            Extracted records, one per group in each experiment.
+        """
+        data = []
+
+        for folder, experiment in self.experiment_data.items():
+            seed_val = experiment['params'].get('seed')
+            if seeds is not None and seed_val not in seeds:
+                continue  # skip if seed filter is active
+
+            trait_entropy = experiment['params']['target_entropy']
             weight_dict = experiment['params']['base_weights']
             weight_entropy = self._calculate_entropy(weight_dict)
 
             measure_dict = experiment["measure_dict"][trait_of_interest][stat_power_measure]
-
             groups_list = experiment["groups"]
-
             recovered_weights_df = experiment["recovered_weights_df"]
 
-            #unpacking aggregate variable for the entire cohort to represent a specific group in the cohort
             for group in groups_list:
-                group_id_within_cohort = group.group_id - 1 #TODO: check if this indexing is right (now reduced by 1 bcz groups start at 1, not 0)
-                group_absolute_error = measure_dict[group_id_within_cohort] 
+                group_id_within_cohort = group.group_id - 1
+                group_absolute_error = measure_dict[group_id_within_cohort]
+                trait_entropy_value = trait_entropy if target_entropy else group.real_entropy
 
-                trait_entropy_value = trait_entropy if target_entropy is True else group.real_entropy #choose between target and real entropy of the group
-
-                # Append extracted data to the list
                 data.append({
-                    "weight_entropy": weight_entropy,  # X-axis
-                    "trait_entropy": trait_entropy_value,  # Y-axis
-                    "stat_power": group_absolute_error,  # Z-axis
-                    "group": group,  # The Group Object
-                    "recovered_weights_df": recovered_weights_df, # The recovered weights DataFrame
-                    "true_weights": weight_dict,  # The true weights
-                    "row_of_interest_in_table": group_id_within_cohort  # The row of interest in the recovered weights table
+                    "seed": seed_val,
+                    "weight_entropy": weight_entropy,
+                    "trait_entropy": trait_entropy_value,
+                    "stat_power": group_absolute_error,
+                    "group": group,
+                    "recovered_weights_df": recovered_weights_df,
+                    "true_weights": weight_dict,
+                    "row_of_interest_in_table": group_id_within_cohort
                 })
 
         return data
@@ -120,11 +132,11 @@ class OutputGenerator:
 
     def plot_heatmaps(
         self, traits, x_label="Weight Entropy", y_label="Trait Entropy",
-        target_entropy=True, cmap="viridis", vmin=None, vmax=None,
+        target_entropy=True,  cmap="viridis", vmin=None, vmax=None,
         annotate=False, fmt=".3f", figsize_per_plot=(5, 4),
         share_scale=True, snap_decimals=6, tick_decimals=3
     ):
-        # Calm, consistent font sizes
+        # Font sizes
         plt.rcParams.update({
             "axes.titlesize": 14,
             "axes.labelsize": 12,
@@ -134,7 +146,7 @@ class OutputGenerator:
         })
 
         def snap(v, d=snap_decimals):
-            # snap to a python float (not numpy scalar) to avoid set/sort surprises
+            # snap to a python float (not numpy scalar)
             return float(np.round(float(v), d))
 
         traits = list(traits)
@@ -153,7 +165,7 @@ class OutputGenerator:
                 })
             df = pd.DataFrame(rows)
             if df.empty:
-                # keep an empty df; we'll handle it below
+                # keep an empty df; it's handled below
                 per_trait_df.append((trait, df))
                 continue
 
