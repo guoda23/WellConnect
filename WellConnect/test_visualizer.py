@@ -2,7 +2,7 @@ from OutputGenerator import OutputGenerator
 
 
 # output_gen = OutputGenerator("Experiment_data/batch_2025-09-25_15-05-11")
-output_gen = OutputGenerator("Experiments/homophily_function_retrievability/stochastic/batch_2025-09-25_17-37-24")
+output_gen = OutputGenerator("Experiments/homophily_function_retrievability/stochastic/batch_2025-09-25_18-29-42")
 
 
 # output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True)
