@@ -10,6 +10,7 @@ import networkx as nx
 import math
 from collections import defaultdict
 import re
+from pathlib import Path
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -23,50 +24,47 @@ class OutputGenerator:
     def _load_experiment_data(self):
         all_experiments_data = {}
 
-        # Recursively walk all subfolders (seed_x/experiment_run_y/)
         for root, _, files in os.walk(self.batch_folder):
             for file in files:
                 if file.endswith(".pkl"):
                     filepath = os.path.join(root, file)
                     with open(filepath, "rb") as f:
                         experiment_data = pickle.load(f)
-                        all_experiments_data[filepath] = experiment_data
+
+                    # detect noise_std from folder name if available
+                    noise_val = None
+                    parts = Path(filepath).parts
+                    for p in parts:
+                        if p.startswith("noise_"):
+                            try:
+                                noise_val = float(p.split("_")[1])
+                            except Exception:
+                                pass
+
+                    # enrich params with noise_std if not already present
+                    if "params" in experiment_data and "noise_std" not in experiment_data["params"]:
+                        experiment_data["params"]["noise_std"] = noise_val
+
+                    all_experiments_data[filepath] = experiment_data
 
         return all_experiments_data
 
+
     
 
-    def extract_metrics(self, trait_of_interest, stat_power_measure='absolute_error', target_entropy=True, seeds=None):
-        """
-        Extract metrics from experiment data.
-
-        Parameters
-        ----------
-        stat_power_measure : str
-            The metric to extract (default: 'absolute_error').
-        trait_of_interest : str
-            Trait to focus on (default: 'Gender').
-        target_entropy : bool
-            Whether to use target or realized group entropy.
-        seeds : list[int] or None
-            If given, only include experiments from these seeds.
-            If None, include all seeds.
-
-        Returns
-        -------
-        list[dict]
-            Extracted records, one per group in each experiment.
-        """
+    def extract_metrics(self, trait_of_interest, stat_power_measure='absolute_error',
+                        target_entropy=True, seeds=None):
         data = []
 
         for folder, experiment in self.experiment_data.items():
             seed_val = experiment['params'].get('seed')
             if seeds is not None and seed_val not in seeds:
-                continue  # skip if seed filter is active
+                continue
 
             trait_entropy = experiment['params']['target_entropy']
             weight_dict = experiment['params']['base_weights']
             weight_entropy = self._calculate_entropy(weight_dict)
+            noise_std = experiment['params'].get('noise_std', None)  # unified handling
 
             measure_dict = experiment["measure_dict"][trait_of_interest][stat_power_measure]
             groups_list = experiment["groups"]
@@ -79,6 +77,7 @@ class OutputGenerator:
 
                 data.append({
                     "seed": seed_val,
+                    "noise_std": noise_std,  # may be None
                     "weight_entropy": weight_entropy,
                     "trait_entropy": trait_entropy_value,
                     "stat_power": group_absolute_error,
@@ -89,6 +88,7 @@ class OutputGenerator:
                 })
 
         return data
+
 
 
     def _calculate_entropy(self, weight_dict): # how evenly distributed are the weights? More uniform weight dist -> higher entropy
@@ -253,11 +253,67 @@ class OutputGenerator:
         plt.tight_layout(rect=[0, 0, 0.88, 1])
         plt.show()
         return fig, axes
+    
+
+    def plot_noise_vs_error(self, stat_power_measure='absolute_error',
+                            target_entropy=True, seeds=None):
+        """
+        Plot average absolute error (aggregated across all traits, groups, entropies, weights, seeds)
+        as a function of noise_std.
+        """
+        data = []
+
+        for folder, experiment in self.experiment_data.items():
+            seed_val = experiment['params'].get('seed')
+            if seeds is not None and seed_val not in seeds:
+                continue
+
+            weight_dict = experiment['params']['base_weights']
+            noise_std = experiment['params'].get('noise_std', None)
+
+            # skip deterministic (no noise_std)
+            if noise_std is None:
+                continue
+
+            groups_list = experiment["groups"]
+            recovered_weights_df = experiment["recovered_weights_df"]
+
+            # measure_dict has structure: trait -> stat_power_measure -> list[group_values]
+            measure_dict = experiment["measure_dict"]
+
+            # collect all errors across traits & groups
+            errors = []
+            for trait, metrics in measure_dict.items():
+                values = metrics[stat_power_measure]
+                errors.extend(values)
+
+            if errors:
+                avg_abs_error = float(np.mean(errors))
+                data.append({
+                    "seed": seed_val,
+                    "noise_std": noise_std,
+                    "avg_abs_error": avg_abs_error,
+                    "true_weights": weight_dict,
+                    "recovered_weights_df": recovered_weights_df
+                })
+
+        df = pd.DataFrame(data)
+        grouped = df.groupby("noise_std")["avg_abs_error"].mean().reset_index()
+
+        plt.scatter(grouped["noise_std"], grouped["avg_abs_error"])
+        plt.xlabel("Noise Std")
+        plt.ylabel("Average Absolute Error (all traits)")
+        plt.title("Noise vs Absolute Error")
+        plt.show()
+
+        return grouped
+
 
 
 
     def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
         """Runs the interactive 3D plot in the browser"""
+        #TODO: check if this works with the new experiment infrastructure, make it work!
         #capitalize strip
         z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
         data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)

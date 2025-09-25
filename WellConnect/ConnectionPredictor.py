@@ -20,7 +20,7 @@ class ConnectionPredictor:
         self.max_distances = max_distances
         
 
-    def predict_weights(self, G):
+    def predict_weights(self, G, **kwargs):
         """
         Assigns predicted weights to edges in group graphs using the homophily function.
 
@@ -36,7 +36,8 @@ class ConnectionPredictor:
                 agent1=agent1,
                 agent2=agent2,
                 weights=self.weights,
-                max_distances=self.max_distances
+                max_distances=self.max_distances,
+                **kwargs #forward other function specific params, e.g., noise level
             )
             G.edges[agent1, agent2]['weight'] = weight
         return G

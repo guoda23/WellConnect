@@ -67,7 +67,7 @@ class WellConnectController:
         for group in groups:
             group.create_group_graph() #create group graphs
             #run the social connection predictions (update graphs with weights)
-            self.connection_predictor.predict_weights(group.network)
+            self.connection_predictor.predict_weights(group.network, **kwargs)
             
 
         #run regression
