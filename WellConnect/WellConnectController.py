@@ -82,9 +82,9 @@ class WellConnectController:
         return recovered_weights_df  #put into a storage file by save_experiment_data()
 
 
-    def statistical_power_analysis(self, traits_of_interest, recovered_weights_df, weights):
+    def statistical_power_analysis(self, traits_of_interest, recovered_weights_df, weights, **kwargs):
         self.statistical_power_calculator = StatisticalPowerCalculator(recovered_weights_df=recovered_weights_df, true_weights=weights)
-        measure_dict = self.statistical_power_calculator.evaluate_predictive_power(attributes=traits_of_interest)
+        measure_dict = self.statistical_power_calculator.evaluate_predictive_power_trait_specific(attributes=traits_of_interest, **kwargs)
         return measure_dict
     
 

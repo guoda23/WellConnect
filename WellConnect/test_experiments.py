@@ -125,8 +125,8 @@ HOMOPHILY_FUNCTION_NAME = "linear_deterministic"  #or "linear_stochastic"
 REGRESSION_TYPE = "constrained"  #or "unconstrained"
 DROP_LAST_VAR = False # trop drop last variable in regression (to prevent collinearity) and reconstruct its weight
 DROP_VAR = None #to drop a specific variable and reconstruct its weight (to prevent collinearity)
-# NAN_PENALTY = 1.0
-# ABNORMALITY_PENALTY = 1.0
+NAN_PENALTY = 1.0
+ABNORMALITY_PENALTY = 1.0
 
 params = {
     'max_distances': MAX_DISTANCES,
@@ -143,8 +143,8 @@ params = {
     'drop_last_var': DROP_LAST_VAR,
     'drop_var': DROP_VAR,
     #TODO: add penalties dynamically
-    # 'NaN_penalty': NAN_PENALTY,
-    # 'Abnormality_penalty': ABNORMALITY_PENALTY,
+    'NaN_penalty': NAN_PENALTY,
+    'Abnormality_penalty': ABNORMALITY_PENALTY,
 }
 
 # ───────────────────────────────────────────
@@ -190,7 +190,9 @@ for target_entropy in TARGET_ENTROPY_LIST:
         measure_dict = controller.statistical_power_analysis(
             traits_of_interest=TRAITS_OF_INTEREST, 
             recovered_weights_df=recovered_weights_df,
-            weights=base_weights
+            weights=base_weights,
+            nan_penalty=NAN_PENALTY,
+            anomaly_penalty=ABNORMALITY_PENALTY
         )
 
         params['target_entropy'] = target_entropy
