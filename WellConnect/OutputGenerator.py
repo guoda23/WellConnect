@@ -16,54 +16,64 @@ from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 
 class OutputGenerator:
-    def __init__(self, batch_folder):
+    def __init__(self, batch_folder, mode):
+        # mode: "deterministic" or "stochastic"
         self.batch_folder = batch_folder
-        self.experiment_data = self._load_experiment_data()
+        self.experiment_data = self._load_experiment_data(mode=mode)
 
-
-    def _load_experiment_data(self):
+    def _load_experiment_data(self, mode="deterministic", seeds=None, noise_levels=None):
         """
-        Recursively load all experiment `.pkl` files under the batch folder.
+        Load experiment `.pkl` files under the batch folder by directly constructing paths.
 
-        Each experiment is unpickled and stored in a dictionary keyed by file path.
-        If a stochastic experiment folder name contains a noise level 
-        (e.g. 'noise_0.2'), that value is parsed and stored in 
-        `experiment['params']['noise_std']` (unless already present).
+        Parameters
+        ----------
+        mode : {"deterministic", "stochastic"}
+            Which type of experiment folder structure to load from.
+        seeds : list[int] or None
+            If given, only load experiments with these seeds.
+        noise_levels : list[float] or None
+            (Only for stochastic) If given, only load experiments with these noise levels.
 
         Returns
         -------
         dict
-            Mapping {filepath: experiment_data}, where each experiment_data 
-            includes at least:
-                - 'params': dict of run parameters (seed, base_weights, target_entropy, ...)
-                - 'groups': list of Group objects
-                - 'measure_dict': nested dict of evaluation metrics
-                - 'recovered_weights_df': DataFrame of regression results
+            Mapping {filepath: experiment_data}.
         """
+        base = Path(self.batch_folder)
         all_experiments_data = {}
 
-        for root, _, files in os.walk(self.batch_folder):
-            for file in files:
-                if file.endswith(".pkl"):
-                    filepath = os.path.join(root, file)
-                    with open(filepath, "rb") as f:
-                        experiment_data = pickle.load(f)
+        if mode == "deterministic":
+            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else base.glob("seed_*")
 
-                    # detect noise_std from folder name if available
-                    noise_val = None
-                    parts = Path(filepath).parts
-                    for p in parts:
-                        if p.startswith("noise_"):
-                            try:
-                                noise_val = float(p.split("_")[1])
-                            except Exception:
-                                pass
+            for sdir in seed_dirs:
+                for run_dir in sdir.glob("experiment_run_*"):
+                    for pkl_file in run_dir.glob("*.pkl"):
+                        with open(pkl_file, "rb") as f:
+                            experiment_data = pickle.load(f)
+                        # deterministic → noise_std = None
+                        experiment_data["params"].setdefault("noise_std", None)
+                        all_experiments_data[str(pkl_file)] = experiment_data
+        elif mode == "stochastic":
+            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else base.glob("seed_*")
 
-                    # enrich params with noise_std if not already present
-                    if "params" in experiment_data and "noise_std" not in experiment_data["params"]:
-                        experiment_data["params"]["noise_std"] = noise_val
+            for sdir in seed_dirs:
+                noise_dirs = [sdir / f"noise_{n}" for n in (noise_levels or [])] if noise_levels else sdir.glob("noise_*")
 
-                    all_experiments_data[filepath] = experiment_data
+                for ndir in noise_dirs:
+                    try:
+                        noise_val = float(str(ndir).split("noise_")[1])
+                    except Exception:
+                        noise_val = None
+
+                    for run_dir in ndir.glob("experiment_run_*"):
+                        for pkl_file in run_dir.glob("*.pkl"):
+                            with open(pkl_file, "rb") as f:
+                                experiment_data = pickle.load(f)
+                            experiment_data["params"].setdefault("noise_std", noise_val)
+                            all_experiments_data[str(pkl_file)] = experiment_data
+
+        else:
+            raise ValueError(f"Unknown mode: {mode}. Use 'deterministic' or 'stochastic'.")
 
         return all_experiments_data
 
@@ -103,7 +113,7 @@ class OutputGenerator:
                 - 'group', 'recovered_weights_df'
                 - 'true_weights', 'row_of_interest_in_table'
         """
-        
+
         data = []
 
         for folder, experiment in self.experiment_data.items():
@@ -187,8 +197,8 @@ class OutputGenerator:
 
 
     def plot_heatmaps(
-        self, traits, x_label="Weight Entropy", y_label="Trait Entropy",
-        target_entropy=True,  cmap="viridis", vmin=None, vmax=None,
+        self, traits, stat_power_measure = "absolute_error", dependent_variable="mean", x_label="Weight Entropy", y_label="Trait Entropy",
+        target_entropy=True,  cmap="viridis", vmin=None, vmax=None, suptitle=False,
         annotate=False, fmt=".3f", figsize_per_plot=(5, 4),
         share_scale=True, snap_decimals=6, tick_decimals=3,
         seeds=None, noise_levels=None #if seeds or noise_levels is specified, only those experiments are included (otherwise all)
@@ -206,6 +216,10 @@ class OutputGenerator:
         ----------
         traits : list[str]
             List of trait names to plot (e.g. ['Gender', 'Age']).
+        stat_power_measure : str, default 'absolute_error'
+            Which metric to extract for the trait (e.g., 'absolute_error', 'bias').
+        dependent_variable : str, default 'mean'
+            Which statistic to plot in each cell (mean, standard deviation, variance).
         x_label, y_label : str
             Axis labels for weight entropy and trait entropy.
         target_entropy : bool, default True
@@ -215,6 +229,8 @@ class OutputGenerator:
         vmin, vmax : float or None
             Fixed color scale range. If None and share_scale=True, scale is 
             determined across all traits.
+        suptitle : bool, default False
+            If True, add a suptitle to the figure.
         annotate : bool, default False
             If True, annotate each cell with its numeric value.
         fmt : str, default '.3f'
@@ -260,7 +276,7 @@ class OutputGenerator:
 
         for trait in traits:
             rows = []
-            for d in self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy, seeds=seeds, noise_levels=noise_levels):
+            for d in self.extract_metrics(trait_of_interest=trait, stat_power_measure=stat_power_measure, target_entropy=target_entropy, seeds=seeds, noise_levels=noise_levels):
                 rows.append({
                     "x": snap(d["weight_entropy"]),
                     "y": snap(d["trait_entropy"]),
@@ -291,12 +307,21 @@ class OutputGenerator:
 
         # Build one grid per trait (pivot + reindex to shared axes)
         grids = []
+        
         for trait, df in per_trait_df:
             if df.empty:
                 grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
             else:
                 # average duplicates of the same (x,y)
-                dfg = df.groupby(["y", "x"], as_index=False)["z"].mean()
+                if dependent_variable == "mean":
+                    dfg = df.groupby(["y", "x"], as_index=False)["z"].mean()
+                elif dependent_variable == "variance":
+                    dfg = df.groupby(["y", "x"], as_index=False)["z"].var()
+                elif dependent_variable == "std":
+                    dfg = df.groupby(["y", "x"], as_index=False)["z"].std()
+                else:
+                    raise ValueError(f"Unknown dependent_variable: {dependent_variable}")
+                
                 pivot = dfg.pivot(index="y", columns="x", values="z")
 
                 # ensure full rectangular grid across shared axes
@@ -311,6 +336,20 @@ class OutputGenerator:
             if stacked.size:
                 if vmin is None: vmin = float(np.nanmin(stacked))
                 if vmax is None: vmax = float(np.nanmax(stacked))
+
+        
+
+        # Decide how to label the plots depending on dependent_variable and statistical measure
+        measure_label = stat_power_measure.replace("_", " ").title().capitalize()
+
+        if dependent_variable == "mean":
+            stat_label = f"Mean {measure_label}"
+        elif dependent_variable == "std":
+            stat_label = f"Std. {measure_label}"
+        elif dependent_variable == "variance":
+            stat_label = f"Variance {measure_label}"
+        else:
+            stat_label = f"{dependent_variable.capitalize()} of {measure_label}"
 
         # Plotting
         n = len(traits)
@@ -337,7 +376,7 @@ class OutputGenerator:
             # Clean trait title: cut at '_' and split CamelCase ("EducationLevel" -> "Education Level")
             pretty = trait.split("_")[0]
             pretty = re.sub(r'(?<!^)(?=[A-Z])', ' ', pretty)
-            ax.set_title(f"Absolute error: {pretty}")
+            ax.set_title(f"{stat_label}: {pretty}")
 
             if annotate:
                 for r in range(len(y_vals)):
@@ -352,8 +391,9 @@ class OutputGenerator:
         cbar = fig.colorbar(ims[0], cax=cbar_ax)
         # no label: cbar.set_label("")
 
-        fig.suptitle("Absolute Error of Regression Coefficients Across Weight and Trait Entropy")
-        plt.tight_layout(rect=[0, 0, 0.88, 1])
+        if suptitle == True:
+            fig.suptitle(f"{stat_label} of Regression Coefficients by Weight and Trait Entropy")
+        plt.tight_layout(rect=[0, 0.05, 0.88, 0.95])
         plt.show()
         return fig, axes
     
@@ -382,7 +422,8 @@ class OutputGenerator:
         pandas.DataFrame
             DataFrame with columns:
                 - 'noise_std': float, noise level
-                - 'avg_abs_error': float, average absolute error across seeds
+                - 'mean': float, mean absolute error across seeds
+                - 'std': float, standard deviation across seeds
         """
         data = []
 
@@ -391,17 +432,12 @@ class OutputGenerator:
             if seeds is not None and seed_val not in seeds:
                 continue
 
-            weight_dict = experiment['params']['base_weights']
             noise_std = experiment['params'].get('noise_std', None)
 
             # skip deterministic (no noise_std)
             if noise_std is None:
                 continue
 
-            groups_list = experiment["groups"]
-            recovered_weights_df = experiment["recovered_weights_df"]
-
-            # measure_dict has structure: trait -> stat_power_measure -> list[group_values]
             measure_dict = experiment["measure_dict"]
 
             # collect all errors across traits & groups
@@ -415,21 +451,27 @@ class OutputGenerator:
                 data.append({
                     "seed": seed_val,
                     "noise_std": noise_std,
-                    "avg_abs_error": avg_abs_error,
-                    "true_weights": weight_dict,
-                    "recovered_weights_df": recovered_weights_df
+                    "avg_abs_error": avg_abs_error
                 })
 
         df = pd.DataFrame(data)
-        grouped = df.groupby("noise_std")["avg_abs_error"].mean().reset_index()
 
-        plt.scatter(grouped["noise_std"], grouped["avg_abs_error"])
+        grouped = df.groupby("noise_std")["avg_abs_error"].agg(['mean', 'std']).reset_index()
+
+        # Plot mean with error bars = ±1 std
+        plt.errorbar(
+            grouped["noise_std"], grouped["mean"],
+            yerr=grouped["std"], fmt="o-", capsize=5, label="Mean ± 1 SD"
+        )
+
         plt.xlabel("Noise Std")
         plt.ylabel("Average Absolute Error (all traits)")
         plt.title("Noise vs Absolute Error")
+        plt.legend()
         plt.show()
 
         return grouped
+
 
 
 
@@ -567,4 +609,72 @@ class OutputGenerator:
 
         plt.tight_layout()
         plt.show()
+
+
+    def plot_trait_collinearity(self, traits, csv_path="data/preprocessed.csv"):
+        """
+        Plots a correlation heatmap and pairplot for selected traits.
+        Works with both numeric and categorical traits by applying one-hot encoding.
+        Labels are prettified for readability.
+
+        Parameters:
+            traits (list[str]): List of trait/column names to include.
+            csv_path (str): Path to the preprocessed dataset (default: 'data/preprocessed.csv').
+        """
+        import re
+
+        # Load dataset
+        df = pd.read_csv(csv_path)
+
+        # Keep only selected traits
+        df_sel = df[traits].copy()
+
+        # One-hot encode categoricals
+        df_num = pd.get_dummies(df_sel, drop_first=True)
+
+        if df_num.empty:
+            print("No usable traits found after encoding.")
+            return
+
+        # --- Prettify labels ---
+        def prettify(col):
+            # Split by underscore
+            parts = col.split("_")
+
+            # Remove "tertiary" if present
+            parts = [p for p in parts if p.lower() != "tertiary"]
+
+            # First part = base trait, add space before capital letters
+            base = re.sub(r'([a-z])([A-Z])', r'\1 \2', parts[0]).strip().title()
+
+            # If extra parts exist, join them as category
+            if len(parts) > 1:
+                cat = " ".join([p.capitalize() for p in parts[1:]])
+                return f"{base}: {cat}"
+            else:
+                return base
+
+        df_num = df_num.rename(columns={c: prettify(c) for c in df_num.columns})
+
+        # 1. Correlation heatmap
+        corr = df_num.corr()
+        plt.figure(figsize=(len(corr.columns), len(corr.columns)))
+        ax = sns.heatmap(corr, annot=False, cmap="coolwarm", vmin=-1, vmax=1, square=True)
+
+        # Rotate x-axis labels
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+
+        plt.title("Correlation Heatmap (with categorical one-hot encoded)")
+        plt.tight_layout()
+        plt.show()
+
+        # 2. Pairplot (only if not too many encoded variables)
+        if df_num.shape[1] <= 5:
+            sns.pairplot(df_num, diag_kind="hist")
+            plt.suptitle("Pairwise Scatterplots (encoded traits)", y=1.02)
+            plt.show()
+        else:
+            print("Pairplot skipped: too many encoded variables ({}).".format(df_num.shape[1]))
+
+
 
