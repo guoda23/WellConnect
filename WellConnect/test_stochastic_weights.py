@@ -69,3 +69,15 @@ if __name__ == "__main__":
         print(f"\nEdge weights with noise_std={noise_std}:")
         for u, v in edges:
             print(f"{u}-{v}: {G.edges[u, v]['weight']:.4f}")
+
+
+# import pickle
+
+# with open("Experiments/homophily_function_retrievability/stochastic/batch_2025-09-26_12-02-55/seed_20/noise_0.2/experiment_run_1/experiment_2025-09-26_12-02-56.pkl", "rb") as f:
+#     exp = pickle.load(f)
+
+# groups = exp["groups"]
+# G = groups[0].network
+
+# for u, v in list(G.edges())[:5]:
+#     print(u, v, G.edges[u, v]["weight"])

@@ -22,6 +22,24 @@ class OutputGenerator:
 
 
     def _load_experiment_data(self):
+        """
+        Recursively load all experiment `.pkl` files under the batch folder.
+
+        Each experiment is unpickled and stored in a dictionary keyed by file path.
+        If a stochastic experiment folder name contains a noise level 
+        (e.g. 'noise_0.2'), that value is parsed and stored in 
+        `experiment['params']['noise_std']` (unless already present).
+
+        Returns
+        -------
+        dict
+            Mapping {filepath: experiment_data}, where each experiment_data 
+            includes at least:
+                - 'params': dict of run parameters (seed, base_weights, target_entropy, ...)
+                - 'groups': list of Group objects
+                - 'measure_dict': nested dict of evaluation metrics
+                - 'recovered_weights_df': DataFrame of regression results
+        """
         all_experiments_data = {}
 
         for root, _, files in os.walk(self.batch_folder):
@@ -50,15 +68,53 @@ class OutputGenerator:
         return all_experiments_data
 
 
-    
-
     def extract_metrics(self, trait_of_interest, stat_power_measure='absolute_error',
-                        target_entropy=True, seeds=None):
+                        target_entropy=True, seeds=None, noise_levels=None):
+        """
+        Extract per-group evaluation metrics from experiments, optionally filtering 
+        by seed and/or noise level.
+
+        For each experiment that passes the filters, this method collects the 
+        error (or other statistical power measure) for the given trait across all groups,
+        together with contextual information (seed, noise_std, entropies, weights).
+
+        Parameters
+        ----------
+        trait_of_interest : str
+            The trait name (key in measure_dict) for which to extract metrics.
+        stat_power_measure : str, default 'absolute_error'
+            Which metric to extract for the trait (e.g., 'absolute_error', 'bias').
+        target_entropy : bool, default True
+            If True, use the target entropy value from params.
+            If False, use the realized entropy of each group.
+        seeds : list[int] or None, default None
+            If provided, only experiments with a matching seed are included.
+        noise_levels : list[float] or None, default None
+            If provided, only experiments with a matching noise_std are included.
+            Deterministic experiments have noise_std=None.
+
+        Returns
+        -------
+        list of dict
+            Each dict corresponds to one group and includes:
+                - 'seed', 'noise_std'
+                - 'weight_entropy', 'trait_entropy'
+                - 'stat_power' (error value for this group)
+                - 'group', 'recovered_weights_df'
+                - 'true_weights', 'row_of_interest_in_table'
+        """
+        
         data = []
 
         for folder, experiment in self.experiment_data.items():
             seed_val = experiment['params'].get('seed')
+            # filter by seed if given
             if seeds is not None and seed_val not in seeds:
+                continue
+            
+            # filter by noise level if given
+            noise_std = experiment['params'].get('noise_std', None)  
+            if noise_levels is not None and noise_std not in noise_levels:
                 continue
 
             trait_entropy = experiment['params']['target_entropy']
@@ -134,8 +190,55 @@ class OutputGenerator:
         self, traits, x_label="Weight Entropy", y_label="Trait Entropy",
         target_entropy=True,  cmap="viridis", vmin=None, vmax=None,
         annotate=False, fmt=".3f", figsize_per_plot=(5, 4),
-        share_scale=True, snap_decimals=6, tick_decimals=3
+        share_scale=True, snap_decimals=6, tick_decimals=3,
+        seeds=None, noise_levels=None #if seeds or noise_levels is specified, only those experiments are included (otherwise all)
     ):
+        
+        """
+        Plot heatmaps of error values for one or more traits across 
+        weight entropy (x-axis) and trait entropy (y-axis).
+
+        Data is extracted using `extract_metrics()`, optionally filtered by seed 
+        and/or noise level. Each subplot corresponds to a trait. Values at the 
+        same (x, y) location are averaged across seeds.
+
+        Parameters
+        ----------
+        traits : list[str]
+            List of trait names to plot (e.g. ['Gender', 'Age']).
+        x_label, y_label : str
+            Axis labels for weight entropy and trait entropy.
+        target_entropy : bool, default True
+            If True, plot against target entropy. If False, use realized entropy.
+        cmap : str, default 'viridis'
+            Colormap for heatmaps.
+        vmin, vmax : float or None
+            Fixed color scale range. If None and share_scale=True, scale is 
+            determined across all traits.
+        annotate : bool, default False
+            If True, annotate each cell with its numeric value.
+        fmt : str, default '.3f'
+            Format string for annotations.
+        figsize_per_plot : tuple(float, float), default (5, 4)
+            Size of each subplot (width, height).
+        share_scale : bool, default True
+            If True, all traits share the same color scale.
+        snap_decimals : int, default 6
+            Decimal places to round entropy values before binning into grid.
+        tick_decimals : int, default 3
+            Decimal places to display in axis tick labels.
+        seeds : list[int] or None, default None
+            If provided, only experiments with these seeds are included.
+        noise_levels : list[float] or None, default None
+            If provided, only experiments with these noise levels are included.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+        axes : list of matplotlib.axes.Axes
+            One axis per trait.
+        """
+        
         # Font sizes
         plt.rcParams.update({
             "axes.titlesize": 14,
@@ -157,7 +260,7 @@ class OutputGenerator:
 
         for trait in traits:
             rows = []
-            for d in self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy):
+            for d in self.extract_metrics(trait_of_interest=trait, target_entropy=target_entropy, seeds=seeds, noise_levels=noise_levels):
                 rows.append({
                     "x": snap(d["weight_entropy"]),
                     "y": snap(d["trait_entropy"]),
@@ -258,8 +361,28 @@ class OutputGenerator:
     def plot_noise_vs_error(self, stat_power_measure='absolute_error',
                             target_entropy=True, seeds=None):
         """
-        Plot average absolute error (aggregated across all traits, groups, entropies, weights, seeds)
-        as a function of noise_std.
+        Plot the relationship between noise level and average error.
+
+        For each stochastic experiment (noise_std != None), collect all errors 
+        across traits and groups, average them within each experiment, and then 
+        average again across seeds for each unique noise level. 
+        Deterministic runs are skipped.
+
+        Parameters
+        ----------
+        stat_power_measure : str, default 'absolute_error'
+            Which metric to aggregate from measure_dict (per trait).
+        target_entropy : bool, default True
+            Currently unused here (included for consistency).
+        seeds : list[int] or None, default None
+            If provided, only experiments with matching seeds are included.
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame with columns:
+                - 'noise_std': float, noise level
+                - 'avg_abs_error': float, average absolute error across seeds
         """
         data = []
 
@@ -285,7 +408,7 @@ class OutputGenerator:
             errors = []
             for trait, metrics in measure_dict.items():
                 values = metrics[stat_power_measure]
-                errors.extend(values)
+                errors.extend(values.values())
 
             if errors:
                 avg_abs_error = float(np.mean(errors))
