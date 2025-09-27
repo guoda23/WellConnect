@@ -197,86 +197,37 @@ class OutputGenerator:
 
 
     def plot_heatmaps(
-        self, traits, stat_power_measure = "absolute_error", dependent_variable="mean", x_label="Weight Entropy", y_label="Trait Entropy",
-        target_entropy=True,  cmap="viridis", vmin=None, vmax=None, suptitle=False,
-        annotate=False, fmt=".3f", figsize_per_plot=(5, 4),
-        share_scale=True, snap_decimals=6, tick_decimals=3,
-        seeds=None, noise_levels=None #if seeds or noise_levels is specified, only those experiments are included (otherwise all)
+        self, traits, stat_power_measure="absolute_error", dependent_variable="mean",
+        x_label="Weight Entropy", y_label="Trait Entropy",
+        target_entropy=True, cmap="viridis", vmin=None, vmax=None,
+        suptitle=False, annotate=False, fmt=".3f",
+        figsize_per_plot=(5, 4), share_scale=True,
+        snap_decimals=6, tick_decimals=3,
+        seeds=None, noise_levels=None,
+        export=True
     ):
-        
-        """
-        Plot heatmaps of error values for one or more traits across 
-        weight entropy (x-axis) and trait entropy (y-axis).
 
-        Data is extracted using `extract_metrics()`, optionally filtered by seed 
-        and/or noise level. Each subplot corresponds to a trait. Values at the 
-        same (x, y) location are averaged across seeds.
-
-        Parameters
-        ----------
-        traits : list[str]
-            List of trait names to plot (e.g. ['Gender', 'Age']).
-        stat_power_measure : str, default 'absolute_error'
-            Which metric to extract for the trait (e.g., 'absolute_error', 'bias').
-        dependent_variable : str, default 'mean'
-            Which statistic to plot in each cell (mean, standard deviation, variance).
-        x_label, y_label : str
-            Axis labels for weight entropy and trait entropy.
-        target_entropy : bool, default True
-            If True, plot against target entropy. If False, use realized entropy.
-        cmap : str, default 'viridis'
-            Colormap for heatmaps.
-        vmin, vmax : float or None
-            Fixed color scale range. If None and share_scale=True, scale is 
-            determined across all traits.
-        suptitle : bool, default False
-            If True, add a suptitle to the figure.
-        annotate : bool, default False
-            If True, annotate each cell with its numeric value.
-        fmt : str, default '.3f'
-            Format string for annotations.
-        figsize_per_plot : tuple(float, float), default (5, 4)
-            Size of each subplot (width, height).
-        share_scale : bool, default True
-            If True, all traits share the same color scale.
-        snap_decimals : int, default 6
-            Decimal places to round entropy values before binning into grid.
-        tick_decimals : int, default 3
-            Decimal places to display in axis tick labels.
-        seeds : list[int] or None, default None
-            If provided, only experiments with these seeds are included.
-        noise_levels : list[float] or None, default None
-            If provided, only experiments with these noise levels are included.
-
-        Returns
-        -------
-        fig : matplotlib.figure.Figure
-        axes : list of matplotlib.axes.Axes
-            One axis per trait.
-        """
-        
-        # Font sizes
         plt.rcParams.update({
-            "axes.titlesize": 14,
-            "axes.labelsize": 12,
-            "xtick.labelsize": 10,
-            "ytick.labelsize": 10,
-            "figure.titlesize": 18
+            "axes.titlesize": 16,
+            "axes.labelsize": 14,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+            "figure.titlesize": 22
         })
 
         def snap(v, d=snap_decimals):
-            # snap to a python float (not numpy scalar)
             return float(np.round(float(v), d))
 
         traits = list(traits)
-
-        # First pass: collect snapped X/Y across ALL traits so subplots share axes
         all_x, all_y = set(), set()
-        per_trait_df = []  # store (trait, df) pairs so we don't recompute
+        per_trait_df = []
 
         for trait in traits:
             rows = []
-            for d in self.extract_metrics(trait_of_interest=trait, stat_power_measure=stat_power_measure, target_entropy=target_entropy, seeds=seeds, noise_levels=noise_levels):
+            for d in self.extract_metrics(
+                trait_of_interest=trait, stat_power_measure=stat_power_measure,
+                target_entropy=target_entropy, seeds=seeds, noise_levels=noise_levels
+            ):
                 rows.append({
                     "x": snap(d["weight_entropy"]),
                     "y": snap(d["trait_entropy"]),
@@ -284,16 +235,12 @@ class OutputGenerator:
                 })
             df = pd.DataFrame(rows)
             if df.empty:
-                # keep an empty df; it's handled below
                 per_trait_df.append((trait, df))
                 continue
-
-            # Update global axes sets
             all_x.update(df["x"].unique().tolist())
             all_y.update(df["y"].unique().tolist())
             per_trait_df.append((trait, df))
 
-        # If nothing to plot, bail gracefully
         if not all_x or not all_y:
             fig, ax = plt.subplots(figsize=(6, 4))
             ax.text(0.5, 0.5, "No data to plot", ha="center", va="center")
@@ -301,18 +248,14 @@ class OutputGenerator:
             plt.show()
             return fig, [ax]
 
-        # Shared sorted axis values (snapped)
         x_vals = sorted(all_x)
         y_vals = sorted(all_y)
-
-        # Build one grid per trait (pivot + reindex to shared axes)
         grids = []
-        
+
         for trait, df in per_trait_df:
             if df.empty:
                 grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
             else:
-                # average duplicates of the same (x,y)
                 if dependent_variable == "mean":
                     dfg = df.groupby(["y", "x"], as_index=False)["z"].mean()
                 elif dependent_variable == "variance":
@@ -321,15 +264,12 @@ class OutputGenerator:
                     dfg = df.groupby(["y", "x"], as_index=False)["z"].std()
                 else:
                     raise ValueError(f"Unknown dependent_variable: {dependent_variable}")
-                
-                pivot = dfg.pivot(index="y", columns="x", values="z")
 
-                # ensure full rectangular grid across shared axes
+                pivot = dfg.pivot(index="y", columns="x", values="z")
                 pivot = pivot.reindex(index=y_vals, columns=x_vals)
                 grid = pivot.to_numpy(dtype=float)
             grids.append((trait, grid))
 
-        # Shared color scale if desired
         if (vmin is None or vmax is None) and share_scale:
             stacked = np.concatenate([g[1].ravel() for g in grids])
             stacked = stacked[~np.isnan(stacked)]
@@ -337,11 +277,7 @@ class OutputGenerator:
                 if vmin is None: vmin = float(np.nanmin(stacked))
                 if vmax is None: vmax = float(np.nanmax(stacked))
 
-        
-
-        # Decide how to label the plots depending on dependent_variable and statistical measure
         measure_label = stat_power_measure.replace("_", " ").title().capitalize()
-
         if dependent_variable == "mean":
             stat_label = f"Mean {measure_label}"
         elif dependent_variable == "std":
@@ -351,29 +287,37 @@ class OutputGenerator:
         else:
             stat_label = f"{dependent_variable.capitalize()} of {measure_label}"
 
-        # Plotting
-        n = len(traits)
+        # --- dynamic vertical sizing ---
+        per_tick_height = 0.18  # inch per y-tick
+        fig_height = max(figsize_per_plot[1], len(y_vals) * per_tick_height)
+
         fig, axes = plt.subplots(
-            1, n, figsize=(figsize_per_plot[0]*n + 1.5, figsize_per_plot[1]),
+            1, len(traits),
+            figsize=(figsize_per_plot[0]*len(traits) + 1.5, fig_height),
             squeeze=False
         )
         axes = axes[0]
 
         ims = []
         for i, (ax, (trait, grid)) in enumerate(zip(axes, grids)):
-            im = ax.imshow(grid, origin="lower", aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+            im = ax.imshow(grid, origin="lower", aspect="auto",
+                        cmap=cmap, vmin=vmin, vmax=vmax)
             ims.append(im)
 
             ax.set_xticks(np.arange(len(x_vals)))
             ax.set_yticks(np.arange(len(y_vals)))
-            ax.set_xticklabels([f"{v:.{tick_decimals}f}" for v in x_vals], rotation=45, ha="right")
-            ax.set_yticklabels([f"{v:.{tick_decimals}f}" for v in y_vals])
+            ax.set_xticklabels([f"{v:.{tick_decimals}f}" for v in x_vals],
+                            rotation=45, ha="right")
+            ax.set_yticklabels([f"{v:.{tick_decimals}f}" for v in y_vals],
+                            rotation=0)
+
+            # --- trim top/bottom whitespace ---
+            ax.set_ylim(-0.5, len(y_vals) - 0.5)
 
             ax.set_xlabel(x_label)
             if i == 0:
                 ax.set_ylabel(y_label)
 
-            # Clean trait title: cut at '_' and split CamelCase ("EducationLevel" -> "Education Level")
             pretty = trait.split("_")[0]
             pretty = re.sub(r'(?<!^)(?=[A-Z])', ' ', pretty)
             ax.set_title(f"{stat_label}: {pretty}")
@@ -383,23 +327,88 @@ class OutputGenerator:
                     for c in range(len(x_vals)):
                         val = grid[r, c]
                         if not np.isnan(val):
-                            ax.text(c, r, format(val, fmt), ha="center", va="center")
+                            ax.text(c, r, format(val, fmt),
+                                    ha="center", va="center")
 
-        # Shared colorbar on the right
         fig.subplots_adjust(right=0.88)
         cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
-        cbar = fig.colorbar(ims[0], cax=cbar_ax)
-        # no label: cbar.set_label("")
+        fig.colorbar(ims[0], cax=cbar_ax)
 
-        if suptitle == True:
+        if suptitle:
             fig.suptitle(f"{stat_label} of Regression Coefficients by Weight and Trait Entropy")
+
         plt.tight_layout(rect=[0, 0.05, 0.88, 0.95])
+        if export==True:
+            fig.savefig(f"Results/homophily_f_retrievability/heatmaps_{dependent_variable}.png", dpi=300, bbox_inches="tight")
         plt.show()
         return fig, axes
-    
+
+    def plot_combined_heatmaps(
+        self,
+        img_mean="Results/homophily_f_retrievability/heatmaps_mean.png",
+        img_std="Results/homophily_f_retrievability/heatmaps_std.png",
+        combined_out="Results/homophily_f_retrievability/heatmaps_combined.png",
+        title="Absolute Error of Regression Coefficients by Weight and Trait Entropy",
+        figsize=(8, 8),
+        show=True,
+        ):
+        """
+        Combine two saved heatmap images (mean and std) into a single figure.
+
+        Parameters
+        ----------
+        img_mean : str
+            Path to the mean heatmap image.
+        img_std : str
+            Path to the std heatmap image.
+        combined_out : str
+            Path where the combined figure should be saved.
+        title : str
+            Suptitle for the figure.
+        figsize : tuple
+            Size of the combined figure.
+        show : bool
+            Whether to call plt.show() at the end.
+        """
+        import matplotlib.image as mpimg
+
+        # Load the saved plot images
+        img1 = mpimg.imread(img_mean)
+        img2 = mpimg.imread(img_std)
+
+        # Create a figure with 2 rows, 1 column
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+
+        # Show first image
+        ax1.imshow(img1)
+        ax1.axis("off")
+
+        # Show second image
+        ax2.imshow(img2)
+        ax2.axis("off")
+
+        # Add a title for the whole figure
+        fig.suptitle(title, fontsize=12, y=0.98)
+
+        # Adjust margins and spacing
+        fig.subplots_adjust(
+            top=0.95,
+            bottom=0.03,
+            left=0.0,
+            right=1.0,
+            hspace=0.05,
+            wspace=0.0,
+        )
+
+        fig.savefig(combined_out, dpi=300, bbox_inches="tight")
+        if show:
+            plt.show()
+
+        return fig, (ax1, ax2)
+
 
     def plot_noise_vs_error(self, stat_power_measure='absolute_error',
-                            target_entropy=True, seeds=None):
+                            target_entropy=True, seeds=None, export=True):
         """
         Plot the relationship between noise level and average error.
 
@@ -459,20 +468,24 @@ class OutputGenerator:
         grouped = df.groupby("noise_std")["avg_abs_error"].agg(['mean', 'std']).reset_index()
 
         # Plot mean with error bars = ±1 std
-        plt.errorbar(
+        fig, ax = plt.subplots()
+
+        ax.errorbar(
             grouped["noise_std"], grouped["mean"],
             yerr=grouped["std"], fmt="o-", capsize=5, label="Mean ± 1 SD"
         )
 
-        plt.xlabel("Noise Std")
-        plt.ylabel("Average Absolute Error (all traits)")
-        plt.title("Noise vs Absolute Error")
-        plt.legend()
+        ax.set_xlabel("Noise Std")
+        ax.set_ylabel("Average Absolute Error (all traits)")
+        ax.set_title("Noise vs Absolute Error")
+        ax.legend()
+
+        if export:
+            fig.savefig(
+                "Results/homophily_f_retrievability/stochastic_error_by_noise.png",
+                dpi=300, bbox_inches="tight"
+            )
         plt.show()
-
-        return grouped
-
-
 
 
 
@@ -580,15 +593,47 @@ class OutputGenerator:
         """
         Plots histograms for selected traits from the preprocessed dataset.
 
-        Parameters:
-            traits (list[str]): List of trait/column names to plot.
-            csv_path (str): Path to the preprocessed dataset (default: 'data/preprocessed.csv').
+        Parameters
+        ----------
+        traits : list[str]
+            List of trait/column names to plot.
+        csv_path : str
+            Path to the preprocessed dataset (default: 'data/preprocessed.csv').
         """
+
+        # Increase global font sizes
+        plt.rcParams.update({
+            "axes.titlesize": 16,
+            "axes.labelsize": 14,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+            "figure.titlesize": 18
+        })
+
+        # Helper to clean names
+        def prettify(name: str) -> str:
+            # Split by underscore
+            parts = name.split("_")
+
+            # Remove "tertiary" if present
+            parts = [p for p in parts if p.lower() != "tertiary"]
+
+            # First part = base trait, split CamelCase
+            base = re.sub(r'(?<!^)(?=[A-Z])', ' ', parts[0]).strip().title()
+
+            # If extra parts exist, join them as category
+            if len(parts) > 1:
+                cat = " ".join([p.capitalize() for p in parts[1:]])
+                return f"{base}: {cat}"
+            else:
+                return base
+
         # Load dataset
         df = pd.read_csv(csv_path)
 
         num_traits = len(traits)
-        fig, axes = plt.subplots(1, num_traits, figsize=(5 * num_traits, 4), sharey=False)
+        fig, axes = plt.subplots(1, num_traits, figsize=(6 * num_traits, 5), sharey=False)
 
         if num_traits == 1:
             axes = [axes]  # make iterable if only one plot
@@ -603,23 +648,35 @@ class OutputGenerator:
             else:
                 df[trait].value_counts().plot(kind="bar", ax=ax, color="#81C784")
 
-            ax.set_title(f"Distribution of {trait}")
-            ax.set_xlabel(trait)
+                # Prettify x-tick labels for categorical traits
+                new_labels = [prettify(lbl.get_text()) for lbl in ax.get_xticklabels()]
+                ax.set_xticklabels(new_labels, rotation=45, ha="right")
+
+            # Title at the top
+            ax.set_title(prettify(trait))
+            ax.set_xlabel("")   # no bottom xlabel
             ax.set_ylabel("Count")
 
         plt.tight_layout()
         plt.show()
 
 
-    def plot_trait_collinearity(self, traits, csv_path="data/preprocessed.csv"):
+    def plot_trait_collinearity(self, traits, csv_path="data/preprocessed.csv", save_path=None):
         """
         Plots a correlation heatmap and pairplot for selected traits.
         Works with both numeric and categorical traits by applying one-hot encoding.
-        Labels are prettified for readability.
+        Labels are prettified for readability. Can also export figures.
 
-        Parameters:
-            traits (list[str]): List of trait/column names to include.
-            csv_path (str): Path to the preprocessed dataset (default: 'data/preprocessed.csv').
+        Parameters
+        ----------
+        traits : list[str]
+            List of trait/column names to include.
+        csv_path : str
+            Path to the preprocessed dataset (default: 'data/preprocessed.csv').
+        save_path : str or None
+            If provided, path prefix to save figures (e.g. 'results/collinearity').
+            Heatmap will be saved as '<save_path>_heatmap.png' and
+            pairplot as '<save_path>_pairplot.png'.
         """
         import re
 
@@ -658,23 +715,40 @@ class OutputGenerator:
 
         # 1. Correlation heatmap
         corr = df_num.corr()
-        plt.figure(figsize=(len(corr.columns), len(corr.columns)))
-        ax = sns.heatmap(corr, annot=False, cmap="coolwarm", vmin=-1, vmax=1, square=True)
+        fig, ax = plt.subplots(figsize=(len(corr.columns) * 1.2, len(corr.columns) * 1.2))
+        sns.heatmap(
+            corr, annot=False, cmap="coolwarm", vmin=-1, vmax=1, square=True,
+            ax=ax, cbar_kws={"shrink": 0.8}
+        )
 
-        # Rotate x-axis labels
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+        # Rotate and enlarge labels
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=12)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)
 
-        plt.title("Correlation Heatmap (with categorical one-hot encoded)")
+        # Title
+        ax.set_title("Correlation Heatmap for Encoded Traits", fontsize=16, pad=20)
+
         plt.tight_layout()
+
+        if save_path:
+            fig.savefig(f"{save_path}_heatmap.png", dpi=300, bbox_inches="tight")
+
         plt.show()
 
         # 2. Pairplot (only if not too many encoded variables)
         if df_num.shape[1] <= 5:
-            sns.pairplot(df_num, diag_kind="hist")
-            plt.suptitle("Pairwise Scatterplots (encoded traits)", y=1.02)
+            g = sns.pairplot(df_num, diag_kind="hist")
+            g.fig.suptitle("Pairwise Scatterplots (encoded traits)", y=1.02, fontsize=16)
+
+            if save_path:
+                g.savefig(f"{save_path}_pairplot.png", dpi=300, bbox_inches="tight")
+            else:
+                g.savefig(f"corr_plot.png", dpi=300, bbox_inches="tight")
+
             plt.show()
         else:
-            print("Pairplot skipped: too many encoded variables ({}).".format(df_num.shape[1]))
+            print(f"Pairplot skipped: too many encoded variables ({df_num.shape[1]}).")
+
 
 
 
