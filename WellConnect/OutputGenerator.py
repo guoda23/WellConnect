@@ -11,6 +11,8 @@ import math
 from collections import defaultdict
 import re
 from pathlib import Path
+import gc, math
+from tqdm import tqdm
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -19,7 +21,8 @@ class OutputGenerator:
     def __init__(self, batch_folder, mode):
         # mode: "deterministic" or "stochastic"
         self.batch_folder = batch_folder
-        self.experiment_data = self._load_experiment_data(mode=mode)
+        self.experiment_data = None
+
 
     def _load_experiment_data(self, mode="deterministic", seeds=None, noise_levels=None):
         """
@@ -343,6 +346,7 @@ class OutputGenerator:
         plt.show()
         return fig, axes
 
+
     def plot_combined_heatmaps(
         self,
         img_mean="Results/homophily_f_retrievability/heatmaps_mean.png",
@@ -406,78 +410,144 @@ class OutputGenerator:
 
         return fig, (ax1, ax2)
 
-
-    def plot_noise_vs_error(self, stat_power_measure='absolute_error',
-                            target_entropy=True, seeds=None, export=True):
+    def build_noise_error_summary(self, batch_folder,
+                                cache_path="Results/noise_error_summary.csv",
+                                stat_power_measure="absolute_error",
+                                seeds=None,
+                                flush_every=1000):
         """
-        Plot the relationship between noise level and average error.
-
-        For each stochastic experiment (noise_std != None), collect all errors 
-        across traits and groups, average them within each experiment, and then 
-        average again across seeds for each unique noise level. 
-        Deterministic runs are skipped.
-
-        Parameters
-        ----------
-        stat_power_measure : str, default 'absolute_error'
-            Which metric to aggregate from measure_dict (per trait).
-        target_entropy : bool, default True
-            Currently unused here (included for consistency).
-        seeds : list[int] or None, default None
-            If provided, only experiments with matching seeds are included.
-
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame with columns:
-                - 'noise_std': float, noise level
-                - 'mean': float, mean absolute error across seeds
-                - 'std': float, standard deviation across seeds
+        Efficiently aggregate mean/std of errors per noise level
+        from experiment_*.pkl files, streaming to CSV with a progress bar.
         """
-        data = []
 
-        for folder, experiment in self.experiment_data.items():
-            seed_val = experiment['params'].get('seed')
+        base = Path(batch_folder)
+        acc = {}   # noise_std -> {"sum": x, "sum_sq": y, "count": n}
+        rows = []
+
+        # gather all pickle files up front so tqdm knows total
+        all_pickles = list(base.rglob("experiment_*.pkl"))
+
+        processed = 0
+        for pkl_file in tqdm(all_pickles, desc="Aggregating experiments"):
+            try:
+                with open(pkl_file, "rb") as f:
+                    exp = pickle.load(f)
+            except Exception:
+                continue
+
+            # filter by seed if needed
+            seed_val = exp["params"].get("seed")
             if seeds is not None and seed_val not in seeds:
                 continue
 
-            noise_std = experiment['params'].get('noise_std', None)
+            noise_std = exp["params"].get("noise_std")
 
-            # skip deterministic (no noise_std)
-            if noise_std is None:
-                continue
-
-            measure_dict = experiment["measure_dict"]
-
-            # collect all errors across traits & groups
-            errors = []
+            measure_dict = exp.get("measure_dict", {})
             for trait, metrics in measure_dict.items():
-                values = metrics[stat_power_measure]
-                errors.extend(values.values())
+                vals = metrics.get(stat_power_measure, {})
+                if isinstance(vals, dict):
+                    for err in vals.values():
+                        if noise_std not in acc:
+                            acc[noise_std] = {"sum": 0.0, "sum_sq": 0.0, "count": 0}
+                        acc[noise_std]["sum"] += err
+                        acc[noise_std]["sum_sq"] += err**2
+                        acc[noise_std]["count"] += 1
 
-            if errors:
-                avg_abs_error = float(np.mean(errors))
-                data.append({
-                    "seed": seed_val,
-                    "noise_std": noise_std,
-                    "avg_abs_error": avg_abs_error
-                })
+            del exp
+            gc.collect()
+            processed += 1
 
-        df = pd.DataFrame(data)
+            # flush periodically to keep memory low
+            if processed % flush_every == 0:
+                rows.extend(self._acc_to_rows(acc))
+                acc = {}
+                pd.DataFrame(rows).to_csv(cache_path, mode="a",
+                                        header=not Path(cache_path).exists(),
+                                        index=False)
+                rows = []
 
-        grouped = df.groupby("noise_std")["avg_abs_error"].agg(['mean', 'std']).reset_index()
+        # flush leftovers
+        rows.extend(self._acc_to_rows(acc))
+        if rows:
+            pd.DataFrame(rows).to_csv(cache_path, mode="a",
+                                    header=not Path(cache_path).exists(),
+                                    index=False)
 
-        # Plot mean with error bars = ±1 std
-        fig, ax = plt.subplots()
+        print(f"✔ Saved summary to {cache_path} after {processed} experiments.")
+        return pd.read_csv(cache_path)
+
+
+    def clean_noise_summary(self, csv_in="Results/noise_error_summary.csv",
+                            csv_out="Results/noise_error_summary_clean.csv"):
+        df = pd.read_csv(csv_in)
+
+        # aggregate to one row per noise_std
+        df_agg = df.groupby("noise_std").agg(
+            mean=("mean", "mean"),      # mean of the per-batch means
+            std=("mean", "std"),        # std of the per-batch means
+            count=("count", "sum")      # total sample count
+        ).reset_index()
+
+        df_agg.to_csv(csv_out, index=False)
+        print(f"✔ Cleaned summary written to {csv_out}")
+        return df_agg
+
+
+    def _acc_to_rows(self, acc):
+        rows = []
+        for noise, d in sorted(acc.items()):
+            mean = d["sum"] / d["count"]
+            var = d["sum_sq"] / d["count"] - mean**2
+            std = math.sqrt(var) if var > 0 else 0.0
+            rows.append({"noise_std": noise,
+                        "mean": mean,
+                        "std": std,
+                        "count": d["count"]})
+        return rows
+
+
+    def plot_noise_vs_error(self, cache_path="Results/noise_error_summary.csv",
+                            stat_power_measure="absolute_error", seeds=None,
+                            export=True, rebuild=False):
+        """
+        Plot Noise vs Avg Absolute Error using a pre-computed summary.
+        """
+
+        plt.rcParams.update({
+            "axes.titlesize": 16,       
+            "axes.labelsize": 14,        
+            "xtick.labelsize": 12,     
+            "ytick.labelsize": 12,
+            "legend.fontsize": 12,
+            "figure.titlesize": 22,
+        })
+
+
+        if not os.path.exists(cache_path) or rebuild:
+            df = self.build_noise_error_summary(
+                cache_path=cache_path,
+                stat_power_measure=stat_power_measure,
+                seeds=seeds
+            )
+        else:
+            df = pd.read_csv(cache_path)
+
+        fig, ax = plt.subplots(figsize=(7, 5))   # width=6 inches, height=4 inches
 
         ax.errorbar(
-            grouped["noise_std"], grouped["mean"],
-            yerr=grouped["std"], fmt="o-", capsize=5, label="Mean ± 1 SD"
+            df["noise_std"], df["mean"],
+            yerr=df["std"],
+            fmt="o-", capsize=5, markersize=7,
+            color="dodgerblue",        # <── line + markers
+            ecolor="deepskyblue",             # <── error bar color
+            elinewidth=1.2,
+            label="Mean ± 1 SD"
+
         )
 
-        ax.set_xlabel("Noise Std")
-        ax.set_ylabel("Average Absolute Error (all traits)")
-        ax.set_title("Noise vs Absolute Error")
+        ax.set_xlabel("Noise Std (σ)", labelpad = 8)
+        ax.set_ylabel("Average Absolute Error", labelpad = 8)
+        ax.set_title("Effect of Gaussian Noise on Regression Error", pad = 12)
         ax.legend()
 
         if export:
@@ -485,7 +555,12 @@ class OutputGenerator:
                 "Results/homophily_f_retrievability/stochastic_error_by_noise.png",
                 dpi=300, bbox_inches="tight"
             )
+            
+        plt.tight_layout(pad=2.0)   # default is ~1.08
         plt.show()
+        return fig, ax
+
+
 
 
 

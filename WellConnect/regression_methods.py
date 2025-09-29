@@ -24,7 +24,7 @@ def constrained_regression(X, y):
     def loss_fn(w):
         return np.sum((X @ w - y) ** 2)
 
-    constraints = [{'type': 'ineq', 'fun': lambda w: np.sum(w) - 1}]
+    constraints = [{'type': 'eq', 'fun': lambda w: np.sum(w) - 1}]
     bounds = [(0, None)] * n_features
     init = np.ones(n_features) / n_features
 

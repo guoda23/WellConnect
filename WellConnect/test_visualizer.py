@@ -6,9 +6,15 @@ output_gen = OutputGenerator("Experiments/homophily_function_retrievability/stoc
 
 # output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True,
 #                          dependent_variable="std", vmax=0.45)
-output_gen.plot_noise_vs_error()
+# output_gen.build_noise_error_summary(batch_folder="Experiments/homophily_function_retrievability/stochastic/batch_2025-09-27_00-14-10")
 
-#histograms
+df_clean = output_gen.clean_noise_summary(
+    csv_in="Results/noise_error_summary.csv",
+    csv_out="Results/noise_error_summary_clean.csv"
+)
+
+output_gen.plot_noise_vs_error(cache_path="Results/noise_error_summary_clean.csv")
+#histogram
 # output_gen.plot_trait_histograms(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'])
 
 #collinearity
