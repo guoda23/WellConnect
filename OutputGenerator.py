@@ -1,4 +1,5 @@
 import os
+import re
 import pickle
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,7 +10,6 @@ import numpy as np
 import networkx as nx
 import math
 from collections import defaultdict
-import re
 from pathlib import Path
 import gc, math
 from tqdm import tqdm
@@ -19,7 +19,15 @@ from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 class OutputGenerator:
     def __init__(self, batch_folder, mode):
-        # mode: "deterministic" or "stochastic"
+        """
+        Visualization and analysis tools for experiment results.
+        Parameters
+        ----------
+        batch_folder : str
+            Path to the batch folder containing experiment subfolders.
+        mode : {"deterministic", "stochastic"}
+            Type of experiments in the batch folder.
+        """
         self.batch_folder = batch_folder
         self.experiment_data = None
 
@@ -207,7 +215,7 @@ class OutputGenerator:
         figsize_per_plot=(5, 4), share_scale=True,
         snap_decimals=6, tick_decimals=3,
         seeds=None, noise_levels=None,
-        export=True
+        export=True, save_path=None
     ):
 
         plt.rcParams.update({
@@ -341,8 +349,10 @@ class OutputGenerator:
             fig.suptitle(f"{stat_label} of Regression Coefficients by Weight and Trait Entropy")
 
         plt.tight_layout(rect=[0, 0.05, 0.88, 0.95])
-        if export==True:
+        if export==True and save_path is None:
             fig.savefig(f"Results/homophily_f_retrievability/heatmaps_{dependent_variable}.png", dpi=300, bbox_inches="tight")
+        elif export==True and save_path is not None:
+            fig.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.show()
         return fig, axes
 

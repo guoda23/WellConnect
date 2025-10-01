@@ -50,4 +50,4 @@ def check_saved_group_entropies(batch_folder, print_all=False):
                                 print(f"  Group {group.group_id}: Real = {real_entropy:.4f} | Δ = {delta:.6f} {status}")
 
 
-check_saved_group_entropies("Experiment_data/batch_2025-09-03_13-57-53")
+check_saved_group_entropies("Experiment_data/homophily_function_retrievability/deterministic/batch_2025-09-26_22-47-38")
