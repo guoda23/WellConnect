@@ -48,13 +48,22 @@ class OutputGenerator:
             If given, only load experiments with these seeds, otherwise all that are available.
         noise_level : float or None
             (Only for stochastic) If given, only load experiments with that noise levels.
-
+        
         Returns
         -------
         dict
             Mapping {filepath: experiment_data}.
         """
         base = Path(self.batch_folder)
+
+        # cache file depends on mode (and noise level for stochastic)
+        if self.mode == "deterministic":
+            cache_file = base / "merged_deterministic.pkl"
+        else:
+            if noise_level is None:
+                raise ValueError("For stochastic mode, you must specify noise_level.")
+            cache_file = base / f"merged_stochastic_noise_{noise_level}.pkl"
+
         all_experiments_data = {}
 
         if self.mode == "deterministic":
@@ -91,6 +100,7 @@ class OutputGenerator:
                         all_experiments_data[str(pkl_file)] = experiment_data
 
         self.experiment_data = all_experiments_data
+            
         return all_experiments_data
 
 
@@ -634,75 +644,137 @@ class OutputGenerator:
     #     return {k: val for k in template_weights.keys()}
 
 
-    # def plot_real_entropy_boxplots(self, weight_choice=None, tol=1e-9, figsize=(7,4), title="Realized group entropies by target entropy (single weight choice)", savepath=None, show=True):
-    #     """
-    #     Make boxplots of realized group entropies (group.real_entropy) for each target_entropy,
-    #     restricted to experiments that used a chosen weight vector.
+    def plot_real_entropy_boxplots(self, seeds=None, savepath=None, show=True,
+                                export=False, all_possible_entropies=None):
+        """
+        Boxplots of realized group entropies grouped by target entropy.
+        X-axis = only the target entropies actually present in the data.
+        Y-axis = full predefined entropy grid for consistency.
+        """
+        buckets = defaultdict(list)
 
-    #     Parameters
-    #     ----------
-    #     weight_choice : dict or None
-    #         Weight dict to filter experiments on (e.g., {'Age': 1/3, 'Gender': 1/3, 'Edu': 1/3}).
-    #         If None, a uniform dict over the first experiment's weight keys is used.
-    #     tol : float
-    #         Tolerance for matching base_weights to `weight_choice`. Default 1e-9.
-    #     figsize : tuple
-    #         Matplotlib figure size (width, height). Default (7, 4).
-    #     title : str or None
-    #         Title for the plot. Use None for no title.
-    #     savepath : str or None
-    #         If given, saves the figure to this path (e.g. 'out/boxplots.png').
-    #     show : bool
-    #         If True, displays the plot with plt.show().
-    #     """
-    #     def weights_match(w_a, w_b):
-    #         if set(w_a.keys()) != set(w_b.keys()):
-    #             return False
-    #         return all(abs(float(w_a[k]) - float(w_b[k])) <= tol for k in w_a)
+        # collect realized entropies per target
+        for exp in self.experiment_data.values():
+            seed_val = exp["params"].get("seed")
+            if seeds is not None and seed_val not in seeds:
+                continue
 
-    #     # default: uniform weights over first experiment keys
-    #     if weight_choice is None:
-    #         for exp in self.experiment_data.values():
-    #             keys = list(exp['params']['base_weights'].keys())
-    #             if keys:
-    #                 val = 1.0 / len(keys)
-    #                 weight_choice = {k: val for k in keys}
-    #                 break
+            target_ent = float(exp["params"]["target_entropy"])
+            for g in exp.get("groups", []):
+                if hasattr(g, "real_entropy") and g.real_entropy is not None:
+                    buckets[target_ent].append(float(g.real_entropy))
 
-    #     buckets = defaultdict(list)
+        if not buckets:
+            print("No experiments found with realized entropies.")
+            return None, None
 
-    #     for exp in self.experiment_data.values():
-    #         base_w = exp['params']['base_weights']
-    #         if not weights_match(base_w, weight_choice):
-    #             continue
+        # targets actually present
+        target_vals = sorted(buckets.keys())
+        data = [buckets[t] for t in target_vals]
 
-    #         target_ent = float(exp['params']['target_entropy'])
-    #         for g in exp.get("groups", []) or []:
-    #             if hasattr(g, "real_entropy") and g.real_entropy is not None:
-    #                 buckets[target_ent].append(float(g.real_entropy))
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-    #     if not buckets:
-    #         print("No matching experiments found for chosen weight vector.")
-    #         return None, None
+        # X positions = just consecutive integers
+        positions = range(len(target_vals))
+        ax.boxplot(data, positions=positions, widths=0.6)
 
-    #     target_vals = sorted(buckets.keys())
-    #     data = [buckets[t] for t in target_vals]
+        # x-ticks show the target entropies you actually had
+        ax.set_xticks(positions)
+        ax.set_xticklabels([f"{t:.4f}" for t in target_vals], rotation=45, ha="right")
 
-    #     fig, ax = plt.subplots(figsize=figsize)
-    #     ax.boxplot(data, labels=[f"{t:.2f}" for t in target_vals])
-    #     ax.set_xlabel("Target Entropy")
-    #     ax.set_ylabel("Realized Group Entropy")
-    #     if title:
-    #         ax.set_title(title)
-    #     ax.grid(True, axis="y", linestyle="--", alpha=0.4)
+        # y-ticks: force to the full grid according to targets
+        if all_possible_entropies is None:
+            if self.mode == "deterministic":
+                all_possible_entropies = [0.0, 0.469, 0.7219, 0.8813, 0.9219, 0.971, 1.0, 1.1568, 1.2955, 1.3568, 1.361, 1.371, 1.4855, 1.5219, 1.571, 1.6855, 1.7219, 1.761, 1.771, 1.8464, 1.8955, 1.9219, 1.961, 1.971, 2.0464, 2.1219, 2.161, 2.171, 2.2464, 2.3219, 2.371, 2.4464, 2.5219, 2.6464, 2.7219, 2.8464, 2.9219, 3.1219, 3.3219]
+            elif self.mode == "stochastic":
+                all_possible_entropies = [0.0, 0.469, 0.7219, 0.8813, 0.9219, 0.971, 1.0, 1.1568, 1.2955, 1.3568, 1.4855, 1.571, 1.6855, 1.771, 1.8955, 1.971, 2.0464, 2.171, 2.371, 2.6464, 2.8464, 3.3219]
 
-    #     plt.tight_layout()
-    #     if savepath:
-    #         fig.savefig(savepath, dpi=200, bbox_inches="tight")
-    #     if show:
-    #         plt.show()
+        ax.set_yticks(all_possible_entropies)
+        ax.set_yticklabels([f"{t:.3f}" for t in all_possible_entropies])
 
-    #     return fig, ax
+        ax.set_xlabel("Target Entropy")
+        ax.set_ylabel("Realized Group Entropy")
+        ax.set_title("Realized vs Target Entropies")
+        ax.grid(True, axis="both", linestyle="--", alpha=0.4)
+
+        plt.tight_layout()
+        if export:
+            if savepath is None:
+                savepath = "Results/homophily_f_retrievability/realized_entropy_boxplots.png"
+            fig.savefig(savepath, dpi=200, bbox_inches="tight")
+
+        if show:
+            plt.show()
+
+        return fig, ax
+    
+
+    def report_unreached_entropies(self, seeds=None, tol=1e-3, decimals=4, aggregate=True):
+        """
+        Report which target entropies were NOT reached (within tolerance) for each seed.
+        Collapses duplicates so each (seed, target_entropy) is only one row.
+
+        Parameters
+        ----------
+        seeds : list[int] or None
+            Restrict to these seeds if provided.
+        tol : float
+            Allowed difference between realized and target entropy.
+        decimals : int
+            Round realized entropies to this many decimals for reporting.
+        aggregate : bool
+            If True, collapse duplicates by seed + target_entropy.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: seed, target_entropy, min_realized, max_realized, n_groups
+        """
+        rows = []
+        for exp in self.experiment_data.values():
+            seed_val = exp["params"].get("seed")
+            if seeds is not None and seed_val not in seeds:
+                continue
+
+            target_ent = float(exp["params"].get("target_entropy", np.nan))
+            realized = []
+            for g in exp.get("groups", []):
+                if hasattr(g, "real_entropy") and g.real_entropy is not None:
+                    realized.append(round(float(g.real_entropy), decimals))
+
+            if not realized:
+                continue
+
+            # check if target entropy is absent from realized values
+            if all(abs(r - target_ent) > tol for r in realized):
+                rows.append({
+                    "seed": seed_val,
+                    "target_entropy": round(target_ent, decimals),
+                    "min_realized": min(realized),
+                    "max_realized": max(realized),
+                    "n_groups": len(realized)
+                })
+
+        df = pd.DataFrame(rows)
+
+        if df.empty:
+            print("All target entropies were reached (within tolerance).")
+            return df
+
+        if aggregate:
+            df = (df.groupby(["seed", "target_entropy"])
+                    .agg(min_realized=("min_realized", "min"),
+                        max_realized=("max_realized", "max"),
+                        n_groups=("n_groups", "sum"))
+                    .reset_index())
+
+        df = df.sort_values(by=["target_entropy", "seed"]).reset_index(drop=True)
+        return df
+
+
+
+
+
     
 #----------------------------------Input data (trait) analysis ----------------------------------
     def plot_trait_histograms(self, traits, csv_path="data/preprocessed.csv"):
