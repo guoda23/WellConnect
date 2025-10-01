@@ -174,5 +174,6 @@ for seed in SEEDS:
                 experiment_count += 1
 
 
-
+# NB: the loops are set up such that each experiment_run_{} folder each has a fixed weight but different trait entropies (so multiple pkl files)
+# This is for efficiency so that we can reuse created groups for different noise levels and weights
 

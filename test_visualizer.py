@@ -1,10 +1,14 @@
+
 from OutputGenerator import OutputGenerator
 
 
-output_gen = OutputGenerator("Experiments/homophily_function_retrievability/deterministic/batch_2025-09-26_22-47-38", mode="deterministic")
-output_gen._load_experiment_data()
+# output_gen = OutputGenerator("Experiments/homophily_function_retrievability/deterministic/batch_2025-09-26_22-47-38", mode="deterministic")
+output_gen = OutputGenerator("Experiments/homophily_function_retrievability/stochastic/batch_2025-09-27_00-14-10", mode="stochastic")
+
+output_gen._load_experiment_data(noise_level=0.30)
+
 output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True,
-                         dependent_variable="mean", vmax=0.45, save_path="Results/homophily_f_retrievability/heatmaps_real_entropy_means.png")
+                         dependent_variable="mean", vmax=0.45, save_path="Results/homophily_f_retrievability/heatmap_noise_0.30.png")
 
 # output_gen.build_noise_error_summary(batch_folder="Experiments/homophily_function_retrievability/stochastic/batch_2025-09-27_00-14-10")
 

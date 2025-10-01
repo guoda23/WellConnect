@@ -31,19 +31,23 @@ class OutputGenerator:
         self.batch_folder = batch_folder
         self.experiment_data = None
 
+        if mode not in ("deterministic", "stochastic"):
+            raise ValueError("mode must be 'deterministic' or 'stochastic'")
+        self.mode = mode
 
-    def _load_experiment_data(self, mode="deterministic", seeds=None, noise_levels=None):
+
+    def _load_experiment_data(self, seeds=None, noise_level=None):
         """
         Load experiment `.pkl` files under the batch folder by directly constructing paths.
+        For stochastic case one noise level must be specified
+        Heatmap generation method helper.
 
         Parameters
         ----------
-        mode : {"deterministic", "stochastic"}
-            Which type of experiment folder structure to load from.
         seeds : list[int] or None
-            If given, only load experiments with these seeds.
-        noise_levels : list[float] or None
-            (Only for stochastic) If given, only load experiments with these noise levels.
+            If given, only load experiments with these seeds, otherwise all that are available.
+        noise_level : float or None
+            (Only for stochastic) If given, only load experiments with that noise levels.
 
         Returns
         -------
@@ -53,10 +57,10 @@ class OutputGenerator:
         base = Path(self.batch_folder)
         all_experiments_data = {}
 
-        if mode == "deterministic":
-            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else base.glob("seed_*")
+        if self.mode == "deterministic":
+            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else list(base.glob("seed_*"))
 
-            for sdir in seed_dirs:
+            for sdir in tqdm(seed_dirs, desc="Loading seeds (deterministic)"):
                 for run_dir in sdir.glob("experiment_run_*"):
                     for pkl_file in run_dir.glob("*.pkl"):
                         with open(pkl_file, "rb") as f:
@@ -64,28 +68,29 @@ class OutputGenerator:
                         # deterministic → noise_std = None
                         experiment_data["params"].setdefault("noise_std", None)
                         all_experiments_data[str(pkl_file)] = experiment_data
-        elif mode == "stochastic":
-            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else base.glob("seed_*")
 
-            for sdir in seed_dirs:
-                noise_dirs = [sdir / f"noise_{n}" for n in (noise_levels or [])] if noise_levels else sdir.glob("noise_*")
+        elif self.mode == "stochastic":
+            if noise_level is None:
+                    raise ValueError("For stochastic mode, you must specify one noise_level.")
+            
+            seed_dirs = [base / f"seed_{s}" for s in (seeds or [])] if seeds else list(base.glob("seed_*"))
 
-                for ndir in noise_dirs:
-                    try:
-                        noise_val = float(str(ndir).split("noise_")[1])
-                    except Exception:
-                        noise_val = None
+            for sdir in tqdm(seed_dirs, desc=f"Loading seeds (stochastic, noise={noise_level})"):
+                noise_dir = sdir / f"noise_{noise_level}"
 
-                    for run_dir in ndir.glob("experiment_run_*"):
-                        for pkl_file in run_dir.glob("*.pkl"):
-                            with open(pkl_file, "rb") as f:
-                                experiment_data = pickle.load(f)
-                            experiment_data["params"].setdefault("noise_std", noise_val)
-                            all_experiments_data[str(pkl_file)] = experiment_data
+                try:
+                    noise_val = float(str(noise_dir).split("noise_")[1])
+                except Exception:
+                    noise_val = None
 
-        else:
-            raise ValueError(f"Unknown mode: {mode}. Use 'deterministic' or 'stochastic'.")
+                for run_dir in noise_dir.glob("experiment_run_*"):
+                    for pkl_file in run_dir.glob("*.pkl"):
+                        with open(pkl_file, "rb") as f:
+                            experiment_data = pickle.load(f)
+                        experiment_data["params"].setdefault("noise_std", noise_val)
+                        all_experiments_data[str(pkl_file)] = experiment_data
 
+        self.experiment_data = all_experiments_data
         return all_experiments_data
 
 
@@ -173,38 +178,6 @@ class OutputGenerator:
         weights = list(weight_dict.values())
         shannon_entropy = entropy(weights, base=2)
         return shannon_entropy
-
-
-    def plot_3d(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error", target_entropy=True): #TODO: remove once interactive plot is ready (run_3d_visualization())
-        """
-        Create a 3D scatter plot using the extracted data.
-        !Non-interactive!
-        """
-        data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-
-        x_data = [d["weight_entropy"] for d in data]
-        y_data = [d["trait_entropy"]  for d in data]
-        z_data = [d["stat_power"] for d in data]
-
-        print(len(x_data), len(y_data), len(z_data))
-        # Scatter plot
-        color_map = plt.cm.viridis 
-        scatter = ax.scatter(x_data, y_data, z_data, c=z_data, cmap="viridis", marker="o")
-
-        # Add axis labels and title
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        ax.set_zlabel(z_label)
-        plt.title("3D Visualization of Group Metrics")
-
-        # Add a color bar to show the mapping of Z-axis values to colors
-        cbar = plt.colorbar(scatter, ax=ax, shrink=0.5, aspect=10, alpha=0.5)
-        cbar.set_label(z_label)
-
-        # Show the plot
-        plt.show()
 
 
     def plot_heatmaps(
@@ -420,8 +393,41 @@ class OutputGenerator:
 
         return fig, (ax1, ax2)
 
+
+    # def plot_3d(self, trait_of_interest, x_label="Weight Entropy", y_label="Trait Entropy", z_label="Weight absolute error", target_entropy=True): #TODO: remove once interactive plot is ready (run_3d_visualization())
+    #     """
+    #     Create a 3D scatter plot using the extracted data.
+    #     !Non-interactive!
+    #     """
+    #     data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(111, projection="3d")
+
+    #     x_data = [d["weight_entropy"] for d in data]
+    #     y_data = [d["trait_entropy"]  for d in data]
+    #     z_data = [d["stat_power"] for d in data]
+
+    #     print(len(x_data), len(y_data), len(z_data))
+    #     # Scatter plot
+    #     color_map = plt.cm.viridis 
+    #     scatter = ax.scatter(x_data, y_data, z_data, c=z_data, cmap="viridis", marker="o")
+
+    #     # Add axis labels and title
+    #     ax.set_xlabel(x_label)
+    #     ax.set_ylabel(y_label)
+    #     ax.set_zlabel(z_label)
+    #     plt.title("3D Visualization of Group Metrics")
+
+    #     # Add a color bar to show the mapping of Z-axis values to colors
+    #     cbar = plt.colorbar(scatter, ax=ax, shrink=0.5, aspect=10, alpha=0.5)
+    #     cbar.set_label(z_label)
+
+    #     # Show the plot
+    #     plt.show()
+
+
     def build_noise_error_summary(self, batch_folder,
-                                cache_path="Results/noise_error_summary.csv",
+                                cache_path=None,
                                 stat_power_measure="absolute_error",
                                 seeds=None,
                                 flush_every=1000):
@@ -431,6 +437,14 @@ class OutputGenerator:
         """
 
         base = Path(batch_folder)
+        if cache_path is None:
+            cache_path = base/"error_by_noise_summary_raw.csv"
+
+        cache_path = Path(cache_path)
+        if cache_path.exists():
+            cache_path = cache_path.with_name(cache_path.stem + "(1)" + cache_path.suffix)
+
+
         acc = {}   # noise_std -> {"sum": x, "sum_sq": y, "count": n}
         rows = []
 
@@ -487,8 +501,21 @@ class OutputGenerator:
         return pd.read_csv(cache_path)
 
 
-    def clean_noise_summary(self, csv_in="Results/noise_error_summary.csv",
-                            csv_out="Results/noise_error_summary_clean.csv"):
+    def clean_noise_summary(self, batch_folder, csv_in=None,
+                            csv_out=None):
+        # Aggregate the raw summary to one row per noise level.
+        base = Path(batch_folder)
+        if csv_in is None:
+            csv_in = base/"error_by_noise_summary_raw.csv"
+
+        if csv_out is None:
+            csv_out = base/"error_by_noise_summary_clean.csv"
+
+        # If file with same name exists add a (1) suffix
+        csv_out = Path(csv_out)
+        if csv_out.exists():
+            csv_out = csv_out.with_name(csv_out.stem + "(1)" + csv_out.suffix)
+
         df = pd.read_csv(csv_in)
 
         # aggregate to one row per noise_std
@@ -516,12 +543,22 @@ class OutputGenerator:
         return rows
 
 
-    def plot_noise_vs_error(self, cache_path="Results/noise_error_summary.csv",
+    def plot_noise_vs_error(self, batch_folder, csv_path=None, save_path=None,
                             stat_power_measure="absolute_error", seeds=None,
-                            export=True, rebuild=False):
+                            export=True):
         """
         Plot Noise vs Avg Absolute Error using a pre-computed summary.
         """
+        base = Path(batch_folder)
+
+        if csv_path is None:
+            csv_path = base/"error_by_noise_summary_clean.csv"
+
+        if not Path(csv_path).exists():
+            raise FileNotFoundError(
+                f"Expected clean summary file at {csv_path}. "
+                "Run build_noise_error_summary() and clean_noise_summary() first."
+            )
 
         plt.rcParams.update({
             "axes.titlesize": 16,       
@@ -533,14 +570,7 @@ class OutputGenerator:
         })
 
 
-        if not os.path.exists(cache_path) or rebuild:
-            df = self.build_noise_error_summary(
-                cache_path=cache_path,
-                stat_power_measure=stat_power_measure,
-                seeds=seeds
-            )
-        else:
-            df = pd.read_csv(cache_path)
+        df = pd.read_csv(csv_path)
 
         fig, ax = plt.subplots(figsize=(7, 5))   # width=6 inches, height=4 inches
 
@@ -561,8 +591,10 @@ class OutputGenerator:
         ax.legend()
 
         if export:
+            if save_path is None:
+                save_path = "Results/homophily_f_retrievability/stochastic_error_by_noise.png"
             fig.savefig(
-                "Results/homophily_f_retrievability/stochastic_error_by_noise.png",
+                save_path,
                 dpi=300, bbox_inches="tight"
             )
             
@@ -573,107 +605,106 @@ class OutputGenerator:
 
 
 
-
-    def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
-        """Runs the interactive 3D plot in the browser"""
-        #TODO: check if this works with the new experiment infrastructure, make it work!
-        #capitalize strip
-        z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
-        data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
-        visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
-        visualizer.run()
-
+    #TODO: make this work with the new experiment infrastructure
+    # def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
+    #     """Runs the interactive 3D plot in the browser"""
+    #     #capitalize strip
+    #     z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
+    #     data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
+    #     visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
+    #     visualizer.run()
 
 
-    def _weights_match(self, w_a: dict, w_b: dict, tol: float = 1e-9) -> bool:
-        """Return True if two weight dicts match within tolerance (keys + values)."""
-        if set(w_a.keys()) != set(w_b.keys()):
-            return False
-        for k in w_a.keys():
-            if not math.isclose(float(w_a[k]), float(w_b[k]), rel_tol=0, abs_tol=tol):
-                return False
-        return True
 
-    def _make_uniform_weights_like(self, template_weights: dict) -> dict:
-        """Build a uniform weight dict over the same keys as template_weights."""
-        n = len(template_weights)
-        if n == 0:
-            return {}
-        val = 1.0 / n
-        return {k: val for k in template_weights.keys()}
+    # def _weights_match(self, w_a: dict, w_b: dict, tol: float = 1e-9) -> bool:
+    #     """Return True if two weight dicts match within tolerance (keys + values)."""
+    #     if set(w_a.keys()) != set(w_b.keys()):
+    #         return False
+    #     for k in w_a.keys():
+    #         if not math.isclose(float(w_a[k]), float(w_b[k]), rel_tol=0, abs_tol=tol):
+    #             return False
+    #     return True
+
+    # def _make_uniform_weights_like(self, template_weights: dict) -> dict:
+    #     """Build a uniform weight dict over the same keys as template_weights."""
+    #     n = len(template_weights)
+    #     if n == 0:
+    #         return {}
+    #     val = 1.0 / n
+    #     return {k: val for k in template_weights.keys()}
 
 
-    def plot_real_entropy_boxplots(self, weight_choice=None, tol=1e-9, figsize=(7,4), title="Realized group entropies by target entropy (single weight choice)", savepath=None, show=True):
-        """
-        Make boxplots of realized group entropies (group.real_entropy) for each target_entropy,
-        restricted to experiments that used a chosen weight vector.
+    # def plot_real_entropy_boxplots(self, weight_choice=None, tol=1e-9, figsize=(7,4), title="Realized group entropies by target entropy (single weight choice)", savepath=None, show=True):
+    #     """
+    #     Make boxplots of realized group entropies (group.real_entropy) for each target_entropy,
+    #     restricted to experiments that used a chosen weight vector.
 
-        Parameters
-        ----------
-        weight_choice : dict or None
-            Weight dict to filter experiments on (e.g., {'Age': 1/3, 'Gender': 1/3, 'Edu': 1/3}).
-            If None, a uniform dict over the first experiment's weight keys is used.
-        tol : float
-            Tolerance for matching base_weights to `weight_choice`. Default 1e-9.
-        figsize : tuple
-            Matplotlib figure size (width, height). Default (7, 4).
-        title : str or None
-            Title for the plot. Use None for no title.
-        savepath : str or None
-            If given, saves the figure to this path (e.g. 'out/boxplots.png').
-        show : bool
-            If True, displays the plot with plt.show().
-        """
-        def weights_match(w_a, w_b):
-            if set(w_a.keys()) != set(w_b.keys()):
-                return False
-            return all(abs(float(w_a[k]) - float(w_b[k])) <= tol for k in w_a)
+    #     Parameters
+    #     ----------
+    #     weight_choice : dict or None
+    #         Weight dict to filter experiments on (e.g., {'Age': 1/3, 'Gender': 1/3, 'Edu': 1/3}).
+    #         If None, a uniform dict over the first experiment's weight keys is used.
+    #     tol : float
+    #         Tolerance for matching base_weights to `weight_choice`. Default 1e-9.
+    #     figsize : tuple
+    #         Matplotlib figure size (width, height). Default (7, 4).
+    #     title : str or None
+    #         Title for the plot. Use None for no title.
+    #     savepath : str or None
+    #         If given, saves the figure to this path (e.g. 'out/boxplots.png').
+    #     show : bool
+    #         If True, displays the plot with plt.show().
+    #     """
+    #     def weights_match(w_a, w_b):
+    #         if set(w_a.keys()) != set(w_b.keys()):
+    #             return False
+    #         return all(abs(float(w_a[k]) - float(w_b[k])) <= tol for k in w_a)
 
-        # default: uniform weights over first experiment keys
-        if weight_choice is None:
-            for exp in self.experiment_data.values():
-                keys = list(exp['params']['base_weights'].keys())
-                if keys:
-                    val = 1.0 / len(keys)
-                    weight_choice = {k: val for k in keys}
-                    break
+    #     # default: uniform weights over first experiment keys
+    #     if weight_choice is None:
+    #         for exp in self.experiment_data.values():
+    #             keys = list(exp['params']['base_weights'].keys())
+    #             if keys:
+    #                 val = 1.0 / len(keys)
+    #                 weight_choice = {k: val for k in keys}
+    #                 break
 
-        buckets = defaultdict(list)
+    #     buckets = defaultdict(list)
 
-        for exp in self.experiment_data.values():
-            base_w = exp['params']['base_weights']
-            if not weights_match(base_w, weight_choice):
-                continue
+    #     for exp in self.experiment_data.values():
+    #         base_w = exp['params']['base_weights']
+    #         if not weights_match(base_w, weight_choice):
+    #             continue
 
-            target_ent = float(exp['params']['target_entropy'])
-            for g in exp.get("groups", []) or []:
-                if hasattr(g, "real_entropy") and g.real_entropy is not None:
-                    buckets[target_ent].append(float(g.real_entropy))
+    #         target_ent = float(exp['params']['target_entropy'])
+    #         for g in exp.get("groups", []) or []:
+    #             if hasattr(g, "real_entropy") and g.real_entropy is not None:
+    #                 buckets[target_ent].append(float(g.real_entropy))
 
-        if not buckets:
-            print("No matching experiments found for chosen weight vector.")
-            return None, None
+    #     if not buckets:
+    #         print("No matching experiments found for chosen weight vector.")
+    #         return None, None
 
-        target_vals = sorted(buckets.keys())
-        data = [buckets[t] for t in target_vals]
+    #     target_vals = sorted(buckets.keys())
+    #     data = [buckets[t] for t in target_vals]
 
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.boxplot(data, labels=[f"{t:.2f}" for t in target_vals])
-        ax.set_xlabel("Target Entropy")
-        ax.set_ylabel("Realized Group Entropy")
-        if title:
-            ax.set_title(title)
-        ax.grid(True, axis="y", linestyle="--", alpha=0.4)
+    #     fig, ax = plt.subplots(figsize=figsize)
+    #     ax.boxplot(data, labels=[f"{t:.2f}" for t in target_vals])
+    #     ax.set_xlabel("Target Entropy")
+    #     ax.set_ylabel("Realized Group Entropy")
+    #     if title:
+    #         ax.set_title(title)
+    #     ax.grid(True, axis="y", linestyle="--", alpha=0.4)
 
-        plt.tight_layout()
-        if savepath:
-            fig.savefig(savepath, dpi=200, bbox_inches="tight")
-        if show:
-            plt.show()
+    #     plt.tight_layout()
+    #     if savepath:
+    #         fig.savefig(savepath, dpi=200, bbox_inches="tight")
+    #     if show:
+    #         plt.show()
 
-        return fig, ax
+    #     return fig, ax
     
-
+#----------------------------------Input data (trait) analysis ----------------------------------
     def plot_trait_histograms(self, traits, csv_path="data/preprocessed.csv"):
         """
         Plots histograms for selected traits from the preprocessed dataset.
