@@ -14,19 +14,35 @@ batch_folder_stochastic = "Experiments/homophily_function_retrievability/stochas
 
 # %%
 output_gen = OutputGenerator("Experiments/homophily_function_retrievability/deterministic/batch_2025-09-26_22-47-38", mode="deterministic")
-
+# %%
 output_gen._load_experiment_data()
 # output_gen.plot_real_entropy_boxplots(export=False)
 
-# %%
-df =output_gen.report_unreached_entropies()
+# # %%
+# df =output_gen.report_unreached_entropies()
 
 #%%
 
-
+# %%
 # output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=False,
 #                          dependent_variable="mean", vmax=0.45, save_path="Results/homophily_f_retrievability/heatmap_noise_0.30.png")
 
+# %%
+output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True,
+                         dependent_variable="mean", vmax=0.45, save_path="Results/homophily_f_retrievability/heatmaps_mean.png", suptitle=True)
+
+output_gen.plot_heatmaps(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'], target_entropy=True,
+                         dependent_variable="std", vmax=0.45, save_path="Results/homophily_f_retrievability/heatmaps_std.png", suptitle=True)
+
+# %%
+output_gen.plot_combined_heatmaps(img_mean="Results/homophily_f_retrievability/heatmaps_mean.png",
+        img_std="Results/homophily_f_retrievability/heatmaps_std.png",
+        combined_out="Results/homophily_f_retrievability/heatmaps_combined.png",
+        title="Absolute Error of Regression Coefficients by Weight and Trait Entropy",
+        figsize=(8, 8.5),
+        show=True)
+
+# %%
 # output_gen.build_noise_error_summary(batch_folder="Experiments/homophily_function_retrievability/stochastic/batch_2025-09-27_00-14-10")
 
 # df_clean = output_gen.clean_noise_summary(
@@ -35,9 +51,10 @@ df =output_gen.report_unreached_entropies()
 # )
 
 # output_gen.plot_noise_vs_error(cache_path="Results/noise_error_summary_clean.csv")
-#histogram
-# output_gen.plot_trait_histograms(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'])
-
+# %%
+# histogram
+output_gen.plot_trait_histograms(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'])
+# %%
 #collinearity
 # output_gen.plot_trait_collinearity(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'])
 
@@ -53,3 +70,5 @@ df =output_gen.report_unreached_entropies()
 
 
 
+
+# %%

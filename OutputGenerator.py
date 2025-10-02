@@ -13,6 +13,7 @@ from collections import defaultdict
 from pathlib import Path
 import gc, math
 from tqdm import tqdm
+import matplotlib.ticker as mticker
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -200,14 +201,17 @@ class OutputGenerator:
         seeds=None, noise_levels=None,
         export=True, save_path=None
     ):
-
-        plt.rcParams.update({
-            "axes.titlesize": 16,
-            "axes.labelsize": 14,
-            "xtick.labelsize": 9,
-            "ytick.labelsize": 9,
-            "figure.titlesize": 22
-        })
+        # --- central style dictionary (local only, no rcParams) ---
+        style = {
+            "axes.titlesize": 20,
+            "axes.labelsize": 18,
+            "xtick.labelsize": 18,
+            "ytick.labelsize": 18,
+            "figure.titlesize": 24,
+            "cbar.labelsize": 18,
+            "cbar.ticklength": 6,
+            "cbar.tickwidth": 1.5,
+        }
 
         def snap(v, d=snap_decimals):
             return float(np.round(float(v), d))
@@ -237,15 +241,29 @@ class OutputGenerator:
 
         if not all_x or not all_y:
             fig, ax = plt.subplots(figsize=(6, 4))
-            ax.text(0.5, 0.5, "No data to plot", ha="center", va="center")
+            ax.text(0.5, 0.5, "No data to plot", ha="center", va="center",
+                    fontsize=style["axes.labelsize"])
             ax.axis("off")
             plt.show()
             return fig, [ax]
 
         x_vals = sorted(all_x)
         y_vals = sorted(all_y)
-        grids = []
 
+        # helper: compute edges for non-uniform grid
+        def make_edges(vals):
+            vals = np.array(vals)
+            mids = (vals[:-1] + vals[1:]) / 2
+            edges = np.concatenate(([vals[0] - (vals[1]-vals[0])/2],
+                                    mids,
+                                    [vals[-1] + (vals[-1]-vals[-2])/2]))
+            return edges
+
+        x_edges = make_edges(x_vals)
+        y_edges = make_edges(y_vals)
+        X, Y = np.meshgrid(x_edges, y_edges)
+
+        grids = []
         for trait, df in per_trait_df:
             if df.empty:
                 grid = np.full((len(y_vals), len(x_vals)), np.nan, dtype=float)
@@ -271,7 +289,8 @@ class OutputGenerator:
                 if vmin is None: vmin = float(np.nanmin(stacked))
                 if vmax is None: vmax = float(np.nanmax(stacked))
 
-        measure_label = stat_power_measure.replace("_", " ").title().capitalize()
+        measure_label = stat_power_measure.replace("_", " ").title()
+
         if dependent_variable == "mean":
             stat_label = f"Mean {measure_label}"
         elif dependent_variable == "std":
@@ -281,8 +300,7 @@ class OutputGenerator:
         else:
             stat_label = f"{dependent_variable.capitalize()} of {measure_label}"
 
-        # --- dynamic vertical sizing ---
-        per_tick_height = 0.18  # inch per y-tick
+        per_tick_height = 0.2
         fig_height = max(figsize_per_plot[1], len(y_vals) * per_tick_height)
 
         fig, axes = plt.subplots(
@@ -294,50 +312,79 @@ class OutputGenerator:
 
         ims = []
         for i, (ax, (trait, grid)) in enumerate(zip(axes, grids)):
-            im = ax.imshow(grid, origin="lower", aspect="auto",
-                        cmap=cmap, vmin=vmin, vmax=vmax)
+            im = ax.pcolormesh(X, Y, grid, cmap=cmap, vmin=vmin, vmax=vmax, shading="auto")
             ims.append(im)
 
-            ax.set_xticks(np.arange(len(x_vals)))
-            ax.set_yticks(np.arange(len(y_vals)))
-            ax.set_xticklabels([f"{v:.{tick_decimals}f}" for v in x_vals],
-                            rotation=45, ha="right")
-            ax.set_yticklabels([f"{v:.{tick_decimals}f}" for v in y_vals],
-                            rotation=0)
+            # --- X axis: major ticks every 0.25, stop at 1.5
+            x_major_ticks = np.arange(0, 1.51, 0.25)
+            ax.set_xticks(x_major_ticks)
+            ax.set_xticklabels([f"{v:.2f}" for v in x_major_ticks],
+                            fontsize=style["xtick.labelsize"], rotation=45, ha="right")
 
-            # --- trim top/bottom whitespace ---
-            ax.set_ylim(-0.5, len(y_vals) - 0.5)
+            # --- Y axis: major ticks every 0.5, stop at 3.0
+            y_major_ticks = np.arange(0, 3.01, 0.5)
+            ax.set_yticks(y_major_ticks)
+            ax.set_yticklabels([f"{v:.1f}" for v in y_major_ticks],
+                            fontsize=style["ytick.labelsize"])
 
-            ax.set_xlabel(x_label)
+            # --- Minor ticks: put them at cell edges for perfect outlines
+            ax.xaxis.set_minor_locator(mticker.FixedLocator(x_edges))
+            ax.yaxis.set_minor_locator(mticker.FixedLocator(y_edges))
+            ax.grid(which="minor", axis="both", linestyle=":", alpha=0.3)
+
+            # Hide the tick marks for minor ticks
+            ax.tick_params(which="minor", bottom=False, top=False, left=False, right=False)
+
+            ax.set_xlabel(x_label, fontsize=style["axes.labelsize"], labelpad=8)
             if i == 0:
-                ax.set_ylabel(y_label)
+                ax.set_ylabel(y_label, fontsize=style["axes.labelsize"], labelpad=8)
 
-            pretty = trait.split("_")[0]
-            pretty = re.sub(r'(?<!^)(?=[A-Z])', ' ', pretty)
-            ax.set_title(f"{stat_label}: {pretty}")
+            # --- make trait label ---
+            trait_label = trait.split("_")[0]                      # e.g. "EducationLevel"
+            trait_label = re.sub(r'(?<!^)(?=[A-Z])', ' ', trait_label)  # → "Education Level"
+            trait_label = trait_label.split()[0]                   # keep only "Education"
+
+            ax.set_title(f"{trait_label}", fontsize=style["axes.titlesize"])
 
             if annotate:
-                for r in range(len(y_vals)):
-                    for c in range(len(x_vals)):
+                for r, yv in enumerate(y_vals):
+                    for c, xv in enumerate(x_vals):
                         val = grid[r, c]
                         if not np.isnan(val):
-                            ax.text(c, r, format(val, fmt),
-                                    ha="center", va="center")
+                            ax.text(xv, yv, format(val, fmt),
+                                    ha="center", va="center",
+                                    fontsize=style["xtick.labelsize"])
 
         fig.subplots_adjust(right=0.88)
         cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
-        fig.colorbar(ims[0], cax=cbar_ax)
+        cbar = fig.colorbar(ims[0], cax=cbar_ax)
+
+        # Colorbar styling (local, no rcParams)
+        cbar.ax.tick_params(
+            labelsize=style["cbar.labelsize"],
+            length=style["cbar.ticklength"],
+            width=style["cbar.tickwidth"]
+        )
 
         if suptitle:
-            fig.suptitle(f"{stat_label} of Regression Coefficients by Weight and Trait Entropy")
+            fig.suptitle(f"{stat_label} of Regression Coefficients by Weight and Trait Entropy",
+                        fontsize=style["figure.titlesize"])
 
         plt.tight_layout(rect=[0, 0.05, 0.88, 0.95])
-        if export==True and save_path is None:
-            fig.savefig(f"Results/homophily_f_retrievability/heatmaps_{dependent_variable}.png", dpi=300, bbox_inches="tight")
-        elif export==True and save_path is not None:
+        if export and save_path is None:
+            fig.savefig(f"Results/homophily_f_retrievability/heatmaps_{dependent_variable}.png",
+                        dpi=300, bbox_inches="tight")
+        elif export and save_path is not None:
             fig.savefig(save_path, dpi=300, bbox_inches="tight")
+
         plt.show()
         return fig, axes
+
+
+
+
+
+
 
 
     def plot_combined_heatmaps(
@@ -347,7 +394,7 @@ class OutputGenerator:
         combined_out="Results/homophily_f_retrievability/heatmaps_combined.png",
         title="Absolute Error of Regression Coefficients by Weight and Trait Entropy",
         figsize=(8, 8),
-        show=True,
+        show=True
         ):
         """
         Combine two saved heatmap images (mean and std) into a single figure.
@@ -384,8 +431,8 @@ class OutputGenerator:
         ax2.imshow(img2)
         ax2.axis("off")
 
-        # Add a title for the whole figure
-        fig.suptitle(title, fontsize=12, y=0.98)
+        # # Add a title for the whole figure
+        # fig.suptitle(title, fontsize=12, y=0.98)
 
         # Adjust margins and spacing
         fig.subplots_adjust(
@@ -393,7 +440,7 @@ class OutputGenerator:
             bottom=0.03,
             left=0.0,
             right=1.0,
-            hspace=0.05,
+            hspace=0.1,
             wspace=0.0,
         )
 
@@ -582,7 +629,7 @@ class OutputGenerator:
 
         df = pd.read_csv(csv_path)
 
-        fig, ax = plt.subplots(figsize=(7, 5))   # width=6 inches, height=4 inches
+        fig, ax = plt.subplots(figsize=(10, 7))   # width=6 inches, height=4 inches
 
         ax.errorbar(
             df["noise_std"], df["mean"],
@@ -789,28 +836,30 @@ class OutputGenerator:
             Path to the preprocessed dataset (default: 'data/preprocessed.csv').
         """
 
-        # Increase global font sizes
-        plt.rcParams.update({
-            "axes.titlesize": 16,
-            "axes.labelsize": 14,
-            "xtick.labelsize": 12,
-            "ytick.labelsize": 12,
-            "legend.fontsize": 12,
-            "figure.titlesize": 18
-        })
+        # --- central style dictionary ---
+        style = {
+            "axes.titlesize": 35,     # subplot titles
+            "axes.labelsize": 32,     # axis labels
+            "xtick.labelsize": 28,    # x ticks
+            "ytick.labelsize": 28,    # y ticks
+            "legend.fontsize": 28,    # legend
+            "figure.titlesize": 40,   # overall figure title
+            "labelpad": 16,           # spacing between ticks and axis labels
+            "color_num": "#3949AB",   # indigo for numeric
+            "color_cat": "#F57C00",   # deep orange for categorical
+        }
 
         # Helper to clean names
         def prettify(name: str) -> str:
-            # Split by underscore
             parts = name.split("_")
-
-            # Remove "tertiary" if present
             parts = [p for p in parts if p.lower() != "tertiary"]
 
-            # First part = base trait, split CamelCase
             base = re.sub(r'(?<!^)(?=[A-Z])', ' ', parts[0]).strip().title()
 
-            # If extra parts exist, join them as category
+            # Special rename: "Education Level" → "Education"
+            if base.lower().startswith("education"):
+                base = "Education"
+
             if len(parts) > 1:
                 cat = " ".join([p.capitalize() for p in parts[1:]])
                 return f"{base}: {cat}"
@@ -821,7 +870,8 @@ class OutputGenerator:
         df = pd.read_csv(csv_path)
 
         num_traits = len(traits)
-        fig, axes = plt.subplots(1, num_traits, figsize=(6 * num_traits, 5), sharey=False)
+        fig, axes = plt.subplots(1, num_traits, figsize=(10 * num_traits, 8))
+
 
         if num_traits == 1:
             axes = [axes]  # make iterable if only one plot
@@ -832,21 +882,35 @@ class OutputGenerator:
                 continue
 
             if pd.api.types.is_numeric_dtype(df[trait]):
-                sns.histplot(df[trait], kde=False, bins=10, ax=ax, color="#7E57C2")
+                sns.histplot(
+                    df[trait], kde=False, bins=10, ax=ax,
+                    color=style["color_num"], edgecolor="black", linewidth=1.0
+                )
             else:
-                df[trait].value_counts().plot(kind="bar", ax=ax, color="#81C784")
+                df[trait].value_counts().plot(
+                    kind="bar", ax=ax,
+                    color=style["color_cat"], edgecolor="black", linewidth=1.0
+                )
 
-                # Prettify x-tick labels for categorical traits
+                # Prettify x-tick labels
                 new_labels = [prettify(lbl.get_text()) for lbl in ax.get_xticklabels()]
-                ax.set_xticklabels(new_labels, rotation=45, ha="right")
+                ax.set_xticklabels(new_labels, rotation=45, ha="right",
+                                fontsize=style["xtick.labelsize"])
 
-            # Title at the top
-            ax.set_title(prettify(trait))
-            ax.set_xlabel("")   # no bottom xlabel
-            ax.set_ylabel("Count")
+            # Titles & labels with local style
+            ax.set_title(prettify(trait), fontsize=style["axes.titlesize"], pad=14)
+            ax.set_xlabel("", fontsize=style["axes.labelsize"], labelpad=style["labelpad"])
+            ax.set_ylabel("Count", fontsize=style["axes.labelsize"], labelpad=style["labelpad"])
+            ax.tick_params(axis="x", labelsize=style["xtick.labelsize"])
+            ax.tick_params(axis="y", labelsize=style["ytick.labelsize"])
 
+        fig.suptitle("Ternary Trait Histograms", fontsize=style["figure.titlesize"], y=1.04)
         plt.tight_layout()
         plt.show()
+
+
+
+
 
 
     def plot_trait_collinearity(self, traits, csv_path="data/preprocessed.csv", save_path=None):
