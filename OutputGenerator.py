@@ -14,6 +14,9 @@ from pathlib import Path
 import gc, math
 from tqdm import tqdm
 import matplotlib.ticker as mticker
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+import matplotlib.image as mpimg
+from PIL import Image   # Pillow for safe resizing
 
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
 
@@ -199,7 +202,9 @@ class OutputGenerator:
         figsize_per_plot=(5, 4), share_scale=True,
         snap_decimals=6, tick_decimals=3,
         seeds=None, noise_levels=None,
-        export=True, save_path=None
+        export=True, save_path=None,
+        custom_trait_labels=None,
+        dpi=300
     ):
         # --- central style dictionary (local only, no rcParams) ---
         style = {
@@ -344,7 +349,10 @@ class OutputGenerator:
             trait_label = re.sub(r'(?<!^)(?=[A-Z])', ' ', trait_label)  # → "Education Level"
             trait_label = trait_label.split()[0]                   # keep only "Education"
 
-            ax.set_title(f"{trait_label}", fontsize=style["axes.titlesize"])
+            if custom_trait_labels:
+                ax.set_title(f"{custom_trait_labels[trait]}", fontsize=style["axes.titlesize"])
+            else:
+                ax.set_title(f"{trait_label}", fontsize=style["axes.titlesize"])
 
             if annotate:
                 for r, yv in enumerate(y_vals):
@@ -373,7 +381,7 @@ class OutputGenerator:
         plt.tight_layout(rect=[0, 0.05, 0.88, 0.95])
         if export and save_path is None:
             fig.savefig(f"Results/homophily_f_retrievability/heatmaps_{dependent_variable}.png",
-                        dpi=300, bbox_inches="tight")
+                        dpi=dpi, bbox_inches="tight")
         elif export and save_path is not None:
             fig.savefig(save_path, dpi=300, bbox_inches="tight")
 
@@ -600,6 +608,7 @@ class OutputGenerator:
         return rows
 
 
+
     def plot_noise_vs_error(self, batch_folder, csv_path=None, save_path=None,
                             stat_power_measure="absolute_error", seeds=None,
                             export=True):
@@ -629,7 +638,7 @@ class OutputGenerator:
 
         df = pd.read_csv(csv_path)
 
-        fig, ax = plt.subplots(figsize=(10, 7))   # width=6 inches, height=4 inches
+        fig, ax = plt.subplots(figsize=(7, 5))   # width=6 inches, height=4 inches
 
         ax.errorbar(
             df["noise_std"], df["mean"],
@@ -658,6 +667,9 @@ class OutputGenerator:
         plt.tight_layout(pad=2.0)   # default is ~1.08
         plt.show()
         return fig, ax
+
+
+
 
 
 
