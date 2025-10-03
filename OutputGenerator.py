@@ -401,7 +401,6 @@ class OutputGenerator:
         img_mean="Results/homophily_f_retrievability/heatmaps_mean.png",
         img_std="Results/homophily_f_retrievability/heatmaps_std.png",
         combined_out="Results/homophily_f_retrievability/heatmaps_combined.png",
-        title="Absolute Error of Regression Coefficients by Weight and Trait Entropy",
         figsize=(8, 8),
         show=True
         ):
@@ -439,9 +438,6 @@ class OutputGenerator:
         # Show second image
         ax2.imshow(img2)
         ax2.axis("off")
-
-        # # Add a title for the whole figure
-        # fig.suptitle(title, fontsize=12, y=0.98)
 
         # Adjust margins and spacing
         fig.subplots_adjust(
@@ -850,7 +846,7 @@ class OutputGenerator:
                 continue
 
             # check if target entropy is absent from realized values
-            if all(abs(r - target_ent) > tol for r in realized):
+            if any(abs(r - target_ent) > tol for r in realized):
                 rows.append({
                     "seed": seed_val,
                     "target_entropy": round(target_ent, decimals),

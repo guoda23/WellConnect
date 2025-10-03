@@ -51,7 +51,6 @@ SEEDS = cfg["seeds"]
 GROUP_SIZE = cfg["group_size"]
 NUM_GROUPS = cfg["num_groups"]  #number of groups to form in one cohort
 GROUP_FORMATION = cfg["group_formation"]
-ENTROPY_TOL = float("inf") if str(cfg["entropy_tol"]).lower() in ("inf", "infinity") else cfg["entropy_tol"]
 TRAITS_OF_INTEREST = cfg["traits_of_interest"]
 HOMOPHILY_FUNCTION_NAME = cfg["homophily_function"]
 # regression related params
@@ -72,7 +71,6 @@ base_params = {
     'group_size': GROUP_SIZE,
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
-    'entropy_tol': ENTROPY_TOL,
     'traits_of_interest': TRAITS_OF_INTEREST,
     'homophily_function': HOMOPHILY_FUNCTION_NAME,
     'regression_type': REGRESSION_TYPE,

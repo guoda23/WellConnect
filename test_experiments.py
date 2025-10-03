@@ -121,7 +121,6 @@ SEED = 20
 GROUP_SIZE = 10
 NUM_GROUPS = 8
 GROUP_FORMATION = "multi-trait-entropy"
-ENTROPY_TOL = float('inf')
 TRAITS_OF_INTEREST =  ['Age_tertiary', 'EducationLevel_tertiary', 'Gender_tertiary']
 HOMOPHILY_FUNCTION_NAME = "linear_deterministic"  #or "linear_stochastic"
 REGRESSION_TYPE = "constrained"  #or "unconstrained"
@@ -137,7 +136,6 @@ params = {
     'group_size': GROUP_SIZE,
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
-    'entropy_tol': ENTROPY_TOL,
     'traits_of_interest': TRAITS_OF_INTEREST,
     'homophily_function': HOMOPHILY_FUNCTION_NAME,
     #regression related params
