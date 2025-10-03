@@ -1,6 +1,7 @@
 import os
 import re
 import pickle
+from statistics import mode
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -675,13 +676,57 @@ class OutputGenerator:
 
 
     #TODO: make this work with the new experiment infrastructure
-    # def run_3d_visualization(self, x_label="Weight Entropy", y_label="Trait Entropy", stat_power_measure='Absolute Error', trait_of_interest='Gender', target_entropy=True):
-    #     """Runs the interactive 3D plot in the browser"""
-    #     #capitalize strip
-    #     z_label = f'{stat_power_measure.strip()} for {trait_of_interest}'
-    #     data = self.extract_metrics(trait_of_interest=trait_of_interest, target_entropy=target_entropy)
-    #     visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
-    #     visualizer.run()
+    def run_3d_visualization(self, seed, noise_level=None,
+                            x_label="Weight Entropy", y_label="Trait Entropy",
+                            stat_power_measure="absolute_error",
+                            trait_of_interest="Gender", target_entropy=True):
+        """
+        Launch an interactive 3D scatterplot for a set of cohorts (fixed by seed, 
+        and noise level if stochastic), showing outcomes across all 
+        entropy configurations.
+
+        Parameters
+        ----------
+        seed : int
+            Cohort identifier (determines the generated dataset).
+        noise_level : float or None, optional
+            Noise level for stochastic experiments. Required if self.mode=="stochastic".
+        x_label : str, default "Weight Entropy"
+            Label for the X-axis.
+        y_label : str, default "Trait Entropy"
+            Label for the Y-axis.
+        stat_power_measure : str, default "absolute_error"
+            Metric to plot on the Z-axis (e.g. "absolute_error", "bias").
+        trait_of_interest : str, default "Gender"
+            Trait for which to visualize the error metric.
+        target_entropy : bool, default True
+            Whether to use target or realized group entropy values.
+        """
+
+        if self.mode == "deterministic":
+            self._load_experiment_data(seeds=[seed])
+        elif self.mode == "stochastic":
+            if noise_level is None:
+                raise ValueError("For stochastic mode, you must specify noise_level.")
+            self._load_experiment_data(seeds=[seed], noise_level=noise_level)
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
+
+        # Axis labels
+        z_label = f"{stat_power_measure.strip()} for {trait_of_interest}"
+
+        # Extract only metrics for this seed/noise
+        data = self.extract_metrics(
+            trait_of_interest=trait_of_interest,
+            stat_power_measure=stat_power_measure,
+            target_entropy=target_entropy,
+            seeds=[seed],
+            noise_levels=[noise_level] if self.mode == "stochastic" else None
+        )
+
+        # Launch interactive 3D visualization
+        visualizer = Visualizer3DScatterPlot(data, x_label, y_label, z_label)
+        visualizer.run()
 
 
 
@@ -770,7 +815,7 @@ class OutputGenerator:
 
     def report_unreached_entropies(self, seeds=None, tol=1e-3, decimals=4, aggregate=True):
         """
-        Report which target entropies were NOT reached (within tolerance) for each seed.
+        Report which target entropies were NOT reached for each seed.
         Collapses duplicates so each (seed, target_entropy) is only one row.
 
         Parameters
@@ -817,7 +862,7 @@ class OutputGenerator:
         df = pd.DataFrame(rows)
 
         if df.empty:
-            print("All target entropies were reached (within tolerance).")
+            print("All target entropies were reached.")
             return df
 
         if aggregate:
@@ -921,10 +966,6 @@ class OutputGenerator:
         plt.show()
 
 
-
-
-
-
     def plot_trait_collinearity(self, traits, csv_path="data/preprocessed.csv", save_path=None):
         """
         Plots a correlation heatmap and pairplot for selected traits.
@@ -944,6 +985,18 @@ class OutputGenerator:
         """
         import re
 
+        FONT_SIZES = {
+            "title": 30,          # main plot titles
+            "xlabel": 18,         # x-axis label
+            "ylabel": 18,         # y-axis label
+            "xtick": 18,          # x tick labels
+            "ytick": 18,          # y tick labels
+            "cbar_label": 20,     # colorbar label
+            "cbar_ticks": 18,     # colorbar tick labels
+            "heatmap_ann": 24,    # numbers/annotations inside heatmap (if annot=True)
+            "pairplot_title": 38, # suptitle for pairplot
+        }
+
         # Load dataset
         df = pd.read_csv(csv_path)
 
@@ -959,16 +1012,9 @@ class OutputGenerator:
 
         # --- Prettify labels ---
         def prettify(col):
-            # Split by underscore
             parts = col.split("_")
-
-            # Remove "tertiary" if present
             parts = [p for p in parts if p.lower() != "tertiary"]
-
-            # First part = base trait, add space before capital letters
             base = re.sub(r'([a-z])([A-Z])', r'\1 \2', parts[0]).strip().title()
-
-            # If extra parts exist, join them as category
             if len(parts) > 1:
                 cat = " ".join([p.capitalize() for p in parts[1:]])
                 return f"{base}: {cat}"
@@ -979,18 +1025,27 @@ class OutputGenerator:
 
         # 1. Correlation heatmap
         corr = df_num.corr()
-        fig, ax = plt.subplots(figsize=(len(corr.columns) * 1.2, len(corr.columns) * 1.2))
+        fig, ax = plt.subplots(figsize=(12, 10))
         sns.heatmap(
             corr, annot=False, cmap="coolwarm", vmin=-1, vmax=1, square=True,
-            ax=ax, cbar_kws={"shrink": 0.8}
+            ax=ax, cbar_kws={"shrink": 0.8, "pad": 0.10}
         )
 
-        # Rotate and enlarge labels
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=12)
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)
+        # Axis labels and ticks
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=FONT_SIZES["xtick"])
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=FONT_SIZES["ytick"])
+        ax.set_title("Correlation Heatmap for Encoded Traits",
+                    fontsize=FONT_SIZES["title"], pad=20)
 
-        # Title
-        ax.set_title("Correlation Heatmap for Encoded Traits", fontsize=16, pad=20)
+        # Colorbar font sizes
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=FONT_SIZES["cbar_ticks"])
+        cbar.ax.set_ylabel("", fontsize=FONT_SIZES["cbar_label"])
+
+
+        for t in cbar.ax.get_yticklabels():
+            t.set_ha("left")  # horizontal alignment
+            t.set_x(1.3)     
 
         plt.tight_layout()
 
@@ -1002,7 +1057,8 @@ class OutputGenerator:
         # 2. Pairplot (only if not too many encoded variables)
         if df_num.shape[1] <= 5:
             g = sns.pairplot(df_num, diag_kind="hist")
-            g.fig.suptitle("Pairwise Scatterplots (encoded traits)", y=1.02, fontsize=16)
+            g.fig.suptitle("Pairwise Scatterplots (encoded traits)",
+                        y=1.02, fontsize=FONT_SIZES["pairplot_title"])
 
             if save_path:
                 g.savefig(f"{save_path}_pairplot.png", dpi=300, bbox_inches="tight")
@@ -1012,7 +1068,5 @@ class OutputGenerator:
             plt.show()
         else:
             print(f"Pairplot skipped: too many encoded variables ({df_num.shape[1]}).")
-
-
 
 

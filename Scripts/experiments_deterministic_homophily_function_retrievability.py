@@ -122,7 +122,6 @@ for seed in SEEDS:
         groups = controller.create_groups(
             strategy=GROUP_FORMATION,
             target_entropy=target_entropy,
-            tolerance=ENTROPY_TOL,
             traits=ATTRIBUTES,
             seed=seed,
             num_groups=NUM_GROUPS

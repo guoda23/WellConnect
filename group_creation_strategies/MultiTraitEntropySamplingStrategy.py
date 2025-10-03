@@ -8,7 +8,7 @@ from group_creation_strategies.GroupCreationStrategy import GroupCreationStrateg
 
 
 class MultiTraitEntropySamplingStrategy(GroupCreationStrategy): 
-    def __init__(self, agents, group_size, target_entropy, traits, tolerance, num_groups=None, seed=None):
+    def __init__(self, agents, group_size, target_entropy, traits, num_groups=None, seed=None):
         """
         Initializes the entropy-controlled sampling strategy (for joint entropy of traits).
 
@@ -17,14 +17,12 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         - group_size (int): Number of individuals per group.
         - target_entropy (float): The target entropy for the groups.
         - traits (str): The traits to use for entropy calculation.
-        - tolerance (float): The allowed tolerance for entropy difference.
         - num_groups (int, optional): Number of groups to form. Defaults to the maximum possible groups.
         - seed (int, optional): Random seed for reproducibility.
         """
         super().__init__(agents, group_size, num_groups, seed) #inherit from parent class
         self.target_entropy = target_entropy
         self.traits = traits
-        self.tolerance = tolerance
 
         if seed is not None:
             self.rng = random.Random(seed)
@@ -34,10 +32,10 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
 
     def create_groups(self): #TODO: potentially make more efficient
         """
-        Create groups while controlling entropy based on the specified trait (greedy - best local choice)
-
-        Returns:
-        - list[Group]: A list of Group objects.
+        Create groups while controlling entropy based on the specified traits.
+        The first member of each group is selected randomly (seeded RNG),
+        then additional members are added greedily to minimize the difference
+        from the target entropy. Ties are broken randomly but reproducibly.
         """
 
         available_agents = self.agents.copy()
@@ -48,15 +46,15 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
             current_entropy = 0.0
 
             while len(group_members) < self.group_size:
-                if group_members:
+                if not group_members:
+                    candidate = self.rng.choice(available_agents)
+                else:
                     current_entropy = self.calculate_joint_entropy(group_members)
+                    # Candidate selection
+                    candidate = self.select_best_candidate(available_agents, group_members)
 
-                # Candidate selection
-                candidate = self.select_best_candidate(available_agents, group_members)
-
-                if candidate is not None:
-                    group_members.append(candidate)
-                    available_agents.remove(candidate)
+                group_members.append(candidate)
+                available_agents.remove(candidate)
             
             group = Group(group_id=group_id, members=group_members)
             #update real entropy after group is filled
@@ -74,7 +72,7 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         Parameters:
         - group_members (list[Agent]): Members of the current group.
         
-        Returns:should_stop
+        Returns:
         - float: Joint entropy value.
         """
         
@@ -84,23 +82,6 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         probabilities = [count / total_count for count in combination_counts.values()]
 
         return entropy(probabilities, base=2) 
-    
-
-    def should_stop_group_formation(self, group_members, current_entropy): #TODO:remove together with tolerance
-        """
-        Checks if group formation should stop based on entropy and group size.
-
-        Parameters:
-        - group_members (list): Current members of the group.
-        - current_entropy (float): Current Shannon entropy of the group's trait distribution.
-
-        Returns:
-        - bool: True if group formation should stop, False otherwise.
-        """
-        return (
-            len(group_members) == self.group_size
-            and abs(current_entropy - self.target_entropy) <= self.tolerance
-        )
     
     
     def select_best_candidate(self, available_agents, group_members):
@@ -115,7 +96,7 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
         - Agent: The best candidate
         """
 
-        best_candidate = None
+        best_candidates = []
         min_entropy_diff = float('inf')
 
         for agent in available_agents:
@@ -126,7 +107,10 @@ class MultiTraitEntropySamplingStrategy(GroupCreationStrategy):
 
             # Update the best candidate if this agent minimizes the entropy difference
             if entropy_diff < min_entropy_diff:
-                best_candidate = agent
-                min_entropy_diff = entropy_diff
+                best_candidates = [agent] #reset list
+                min_entropy_diff = entropy_diff 
+            elif entropy_diff == min_entropy_diff:
+                best_candidates.append(agent) #add to tie list
 
-        return best_candidate
+        # break ties reproducibly using the seeded RNG
+        return self.rng.choice(best_candidates)

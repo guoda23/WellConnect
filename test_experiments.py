@@ -173,7 +173,6 @@ for target_entropy in TARGET_ENTROPY_LIST:
     groups = controller.create_groups(
         strategy=GROUP_FORMATION,
         target_entropy=target_entropy,
-        tolerance=ENTROPY_TOL,
         traits=ATTRIBUTES,
         seed=SEED,
         num_groups=NUM_GROUPS

@@ -10,7 +10,6 @@
   "group_size": 10,
   "num_groups": 8,
   "group_formation": "multi-trait-entropy",
-  "entropy_tol": "inf",
   "traits_of_interest": ["Age_tertiary", "EducationLevel_tertiary", "Gender_tertiary"],
   "homophily_function": "linear_stochastic",
   "regression_type": "constrained",

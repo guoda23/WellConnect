@@ -40,7 +40,6 @@ if __name__ == "__main__":
     groups = controller.create_groups(
         strategy=GROUP_FORMATION,
         target_entropy=TARGET_ENTROPY,
-        tolerance=float("inf"),
         traits=ATTRIBUTES,
         seed=SEED,
         num_groups=NUM_GROUPS,
