@@ -652,6 +652,7 @@ class OutputGenerator:
         ax.set_ylabel("Average Absolute Error", labelpad = 8)
         ax.set_title("Effect of Gaussian Noise on Regression Error", pad = 12)
         ax.legend()
+        
 
         if export:
             if save_path is None:
