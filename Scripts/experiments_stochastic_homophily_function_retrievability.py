@@ -156,7 +156,7 @@ for seed in SEEDS:
                 params['base_weights'] = base_weights
                 params['noise_std'] = noise_std
 
-                run_dir = noise_dir / f"experiment_run_{experiment_count}"
+                run_dir = noise_dir / f"experiment_run_{experiment_count}_target_e_{target_entropy}"
                 run_dir.mkdir(exist_ok=True)
 
                 controller.save_experiment_data(groups,
