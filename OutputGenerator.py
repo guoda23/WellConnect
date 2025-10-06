@@ -390,12 +390,6 @@ class OutputGenerator:
         return fig, axes
 
 
-
-
-
-
-
-
     def plot_combined_heatmaps(
         self,
         img_mean="Results/homophily_f_retrievability/heatmaps_mean.png",

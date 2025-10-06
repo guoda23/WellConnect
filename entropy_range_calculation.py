@@ -54,14 +54,14 @@ def entropy_from_partition(part):
     return entropy(probs, base=2)
 
 # Compute distinct entropies
-partition_entropies = [(part, round(entropy_from_partition(part), 4)) for part in partitions_of_10]
+partition_entropies = [(part, entropy_from_partition(part)) for part in partitions_of_10]
 unique_entropies = sorted({e for _, e in partition_entropies})
 
 print("All unique entropy values (rounded to 4 decimals):")
 print(len(unique_entropies))
 print("\nNumber of unique entropy values:", len(unique_entropies))
 
-print("\nPartitions with entropy < 1.0:")
+print("\nPartitions with entropies")
 for part, e in partition_entropies:
-    if e < 1.0:
-        print(f"{part} → {e}")
+    print(f"{part} → {entropy_from_partition(part):.3f}")
+
