@@ -1,0 +1,25 @@
+{
+  "experiment_name": "transmission",
+  "attributes": ["Age_tertiary", "EducationLevel_tertiary", "Gender_tertiary","PHQ9_Total", "PANCRS_TotalPositive", "PANCRS_TotalNegative", "PANCRS_FrequencyPositive", "PANCRS_FrequencyNegative"],
+  "max_distances": {
+    "Age_tertiary": 1,
+    "EducationLevel_tertiary": 1,
+    "Gender_tertiary": 1
+  },
+  "group_size": 10,
+  "num_groups": 8,
+  "group_formation": "multi-trait-entropy",
+  "traits_of_interest": ["Age_tertiary", "EducationLevel_tertiary", "Gender_tertiary"],
+  "homophily_function": "linear_stochastic",
+  "regression_type": "constrained",
+  "drop_last_var": false,
+  "drop_var": null,
+  "nan_penalty": 1.0,
+  "anomaly_penalty": 1.0,
+  "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "target_entropy_list": [1.361],
+  "base_weights_list": [
+      {"Age_tertiary": 0.7, "EducationLevel_tertiary": 0.2, "Gender_tertiary": 0.1}
+  ],
+  "noise_stds": [0.2]
+}

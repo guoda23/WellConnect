@@ -29,10 +29,10 @@ class HMDhModel:
                  alpha_r_mp=1, #global multiplier for spontaneous transitions (alpha) towards recovery states (M->H, D->H, D->M)
                  beta_i_mp=1, #global multiplier for social contagion into worse states
                  beta_r_mp=1, #global multiplier for social contagion into recovery states
-                 mtp_a_i_individual=np.array([1, 1, 1]), #scaling global multiplier for spontaneous transitions in worsening directions (H->M, H->D, M->D)
-                 mtp_a_r_individual=np.array([1, 1, 1]), #scaling global multiplier for spontaneous transitions towards recovery states (M->H, D->H, D->M)
-                 mtp_b_i_individual=np.array([1, 1, 1, 1]), #scaling global multiplier for social contagion into worse states (H->M, H->D, M->D, D->M)
-                 mtp_b_r_individual=np.array([1, 1, 1]), #scaling global multiplier for social contagion into recovery states (M->H, D->H, D->M)
+                 mtp_a_i_individual=np.array([1, 1, 1]), # individual scaling global multipliers for spontaneous transitions in worsening directions (H->M, H->D, M->D)
+                 mtp_a_r_individual=np.array([1, 1, 1]), # individual scaling global multipliers for spontaneous transitions towards recovery states (M->H, D->H, D->M)
+                 mtp_b_i_individual=np.array([1, 1, 1, 1]), # individual scaling global multipliers for social contagion into worse states (H->M, H->D, M->D, D->M)
+                 mtp_b_r_individual=np.array([1, 1, 1]), # individual scaling global multipliers for social contagion into recovery states (M->H, D->H, D->M)
                  flat_ai=0, flat_ar=0, flat_bi=0, flat_br=0, #control over base probabilities (intercept)
                  state_attr="depression_state",
                  phq9_attr="PHQ9_Total"):
@@ -80,6 +80,7 @@ class HMDhModel:
             'h_m_d': np.array([0.0271 * mtp_bi[3] + flat_bi]) / 46,
         }
 
+
     def classify_depression_state(self, phq_score):
         """
         Categorizes an agent into 0 (Healthy), 1 (Mild), or 2 (Depressed) based on PHQ-9 score.
@@ -99,6 +100,7 @@ class HMDhModel:
             score = getattr(agent, self.phq9_attr)
             setattr(agent, self.state_attr, self.classify_depression_state(score))
 
+
     def update_state(self):
         """
         Performs a single simulation step:
@@ -108,6 +110,7 @@ class HMDhModel:
         """
         constants = self.constants
         agents = list(self.g.nodes)
+
         state = np.array([getattr(agent, self.state_attr) for agent in agents])
 
         healthy_idx = np.where(state == 0)[0]
@@ -150,6 +153,7 @@ class HMDhModel:
 
         for i, agent in enumerate(agents):
             setattr(agent, self.state_attr, int(state[i]))
+
 
     def run(self, group, steps=None):
         """

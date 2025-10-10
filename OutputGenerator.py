@@ -211,8 +211,8 @@ class OutputGenerator:
         style = {
             "axes.titlesize": 20,
             "axes.labelsize": 18,
-            "xtick.labelsize": 18,
-            "ytick.labelsize": 18,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
             "figure.titlesize": 24,
             "cbar.labelsize": 18,
             "cbar.ticklength": 6,
@@ -283,6 +283,16 @@ class OutputGenerator:
                 else:
                     raise ValueError(f"Unknown dependent_variable: {dependent_variable}")
 
+                print(f"\nAverages for {trait}:")
+                print(dfg.sort_values(["y", "x"])
+                        .to_string(index=False,
+                                    formatters={
+                                        "x": "{:.3f}".format,
+                                        "y": "{:.3f}".format,
+                                        "z": "{:.3f}".format
+                                    }))
+
+
                 pivot = dfg.pivot(index="y", columns="x", values="z")
                 pivot = pivot.reindex(index=y_vals, columns=x_vals)
                 grid = pivot.to_numpy(dtype=float)
@@ -321,17 +331,29 @@ class OutputGenerator:
             im = ax.pcolormesh(X, Y, grid, cmap=cmap, vmin=vmin, vmax=vmax, shading="auto")
             ims.append(im)
 
-            # --- X axis: major ticks every 0.25, stop at 1.5
-            x_major_ticks = np.arange(0, 1.51, 0.25)
-            ax.set_xticks(x_major_ticks)
-            ax.set_xticklabels([f"{v:.2f}" for v in x_major_ticks],
+            # # --- X axis: major ticks every 0.25, stop at 1.5
+            # x_major_ticks = np.arange(0, 1.51, 0.25)
+            # ax.set_xticks(x_major_ticks)
+            # ax.set_xticklabels([f"{v:.2f}" for v in x_major_ticks],
+            #                 fontsize=style["xtick.labelsize"], rotation=45, ha="right")
+
+            # # --- Y axis: major ticks every 0.5, stop at 3.0
+            # y_major_ticks = np.arange(0, 3.01, 0.5)
+            # ax.set_yticks(y_major_ticks)
+            # ax.set_yticklabels([f"{v:.1f}" for v in y_major_ticks],
+            #                 fontsize=style["ytick.labelsize"])
+
+
+            # --- X axis: exact discrete ticks for every x entry ---
+            ax.set_xticks(x_vals)
+            ax.set_xticklabels([f"{v:.{tick_decimals}f}" for v in x_vals],
                             fontsize=style["xtick.labelsize"], rotation=45, ha="right")
 
-            # --- Y axis: major ticks every 0.5, stop at 3.0
-            y_major_ticks = np.arange(0, 3.01, 0.5)
-            ax.set_yticks(y_major_ticks)
-            ax.set_yticklabels([f"{v:.1f}" for v in y_major_ticks],
+            # --- Y axis: exact discrete ticks for every y entry ---
+            ax.set_yticks(y_vals)
+            ax.set_yticklabels([f"{v:.{tick_decimals}f}" for v in y_vals],
                             fontsize=style["ytick.labelsize"])
+
 
             # --- Minor ticks: put them at cell edges for perfect outlines
             ax.xaxis.set_minor_locator(mticker.FixedLocator(x_edges))

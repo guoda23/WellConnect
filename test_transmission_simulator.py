@@ -66,8 +66,8 @@ def test_voter_model_on_group(group, steps=5):
     # print("Plot saved as voter_model_phq9_plot.png")
 
 if __name__ == "__main__":
-    PKL = "Experiment_data/batch_2025-07-21_14-57-39/experiment_run_1/experiment_2025-07-21_14-57-39.pkl"
+    PKL = "Experiments/transmission/batch_2025-10-10_12-34-39/seed_4/noise_0.2/experiment_run_1_target_e_1.361_weight_e_1.1568/experiment_2025-10-10_12-34-44.pkl"
     group = load_group_from_pickle(PKL, idx=0)
 
-    # test_hmdh_model_on_group(group, steps=50)
-    test_voter_model_on_group(group, steps=10)
+    test_hmdh_model_on_group(group, steps=50)
+    # test_voter_model_on_group(group, steps=10)
