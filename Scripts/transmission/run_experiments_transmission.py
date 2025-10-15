@@ -138,7 +138,7 @@ for seed in SEEDS:
                     noise_std=noise_std
                 )
 
-                contagion_histories = controller.simulate_depression_dynamics(groups, seed=seed, steps=MODEL_STEPS, model_type="HMDhModel")
+                contagion_histories = controller.simulate_depression_dynamics(groups, seed=seed, steps=MODEL_STEPS, model_type="HMDaModel")
 
 
                 params = dict(base_params) #copy base params

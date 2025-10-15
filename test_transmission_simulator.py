@@ -1,5 +1,5 @@
 # ───────────────────────────────
-# Quick HMDhModel test script
+# Quick HMDaModel test script
 # ───────────────────────────────
 import os
 import pickle
@@ -16,13 +16,13 @@ def load_groups_from_pickle(pkl_path):
 
 
 def run_hmdh_on_group(group, steps=50, seed=1):
-    """Run HMDhModel simulation on one group."""
-    sim = TransmissionSimulator(model_type="HMDhModel", seed=seed)
+    """Run HMDaModel simulation on one group."""
+    sim = TransmissionSimulator(model_type="HMDaModel", seed=seed)
     history, agents = sim.run(group, steps=steps)
     return np.array(history)
 
 
-def plot_group_dynamics(histories, title="HMDhModel Simulation"):
+def plot_group_dynamics(histories, title="HMDaModel Simulation"):
     """Plot multiple group histories and their average trajectory."""
     labels = ["Healthy", "Mild", "Depressed"]
     colors = ["green", "orange", "red"]
@@ -58,4 +58,4 @@ if __name__ == "__main__":
     all_histories = [run_hmdh_on_group(g, steps=100) for g in groups]
 
     # Plot
-    plot_group_dynamics(all_histories, title="HMDhModel dynamics (seed 1, entropy 1.2955)")
+    plot_group_dynamics(all_histories, title="HMDaModel dynamics (seed 1, entropy 1.2955)")

@@ -1,6 +1,6 @@
 from TransmissionVisualizer import TransmissionVisualizer
 viz = TransmissionVisualizer(
-    batch_folder="Experiments/transmission/batch_2025-10-15_11-49-32"
+    batch_folder="Experiments/transmission/batch_2025-10-15_16-08-05"
 )
 
 viz.load_experiment_data(noise_level=0.15)

@@ -22,9 +22,9 @@ class TransmissionSimulator:
         **kwargs :
             Model-specific keyword arguments passed to the chosen model class.
         """
-        if model_type == 'HMDhModel':
-            from transmission_models.HMDhModel import HMDhModel
-            return HMDhModel(**kwargs)
+        if model_type == 'HMDaModel':
+            from transmission_models.HMDaModel import HMDaModel
+            return HMDaModel(**kwargs)
         elif model_type == 'BoundedConfidenceVoterModel':
             from transmission_models.BoundedConfidenceVoterModel import BoundedConfidenceVoterModel
             return BoundedConfidenceVoterModel(**kwargs)
