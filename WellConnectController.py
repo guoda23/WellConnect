@@ -10,6 +10,7 @@ from RegressionRunner import RegressionRunner
 from StatisticalPowerCalculator import StatisticalPowerCalculator
 from OutputGenerator import OutputGenerator
 from Visualizer3DScatterplot import Visualizer3DScatterPlot
+from TransmissionSimulator import TransmissionSimulator
 
 class WellConnectController:
     def __init__(self, data_path, group_size, attributes, max_distances, file_type = 'csv'):
@@ -61,15 +62,18 @@ class WellConnectController:
         return groups
     
 
-    def run_on_groups(self, groups,  homophily_function_name, weights, drop_last_var, drop_var, regression_type, mode = 'synthetic data', **kwargs):
+    def predict_group_connections(self, groups,  homophily_function_name, weights, **kwargs):
+        
         self.connection_predictor = ConnectionPredictor(weights=weights, max_distances=self.max_distances, homophily_function_name=homophily_function_name)
 
         for group in groups:
             group.create_group_graph() #create group graphs
             #run the social connection predictions (update graphs with weights)
             self.connection_predictor.predict_weights(group.network, **kwargs)
-            
 
+        return groups
+
+    def recover_group_connections(self, groups , weights, drop_last_var, drop_var, regression_type, mode = 'synthetic data'):
         #run regression
         self.regression_runner = RegressionRunner(attributes=list(weights.keys()), max_distances=self.max_distances, regression_type=regression_type)
         recovered_weights_df = self.regression_runner.perform_group_regression(groups=groups, drop_last_var=drop_last_var, drop_var=drop_var)
@@ -88,25 +92,47 @@ class WellConnectController:
         return measure_dict
     
 
-    def save_experiment_data(self, groups, recovered_weights_df, params, experiment_folder, measure_dict = None):
-        #one experiment data file contains one cohort run i.e. the number of groups specified from the population
+    def simulate_depression_dynamics(self, groups, seed, steps, model_type="HMDhModel"):
+        """
+        Runs the depression transmission model (HMDhModel) on every group
+        and returns a dictionary mapping group_id -> simulation history (np.array of shape [steps, 3]).
+        """
+        contagion_sim = TransmissionSimulator(model_type=model_type, seed=seed)
+        contagion_history_dict = {}
+
+        for group in groups:
+            history, _ = contagion_sim.run(group, steps=steps)
+            contagion_history_dict[group.group_id] = history
+
+        return contagion_history_dict
+    
+
+    def save_experiment_data(self, groups, params, experiment_folder,
+                            recovered_weights_df=None, measure_dict=None,
+                            contagion_histories=None):
+        
         os.makedirs(experiment_folder, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = os.path.join(experiment_folder, f"experiment_{timestamp}.pkl")
 
-        experiment_data = { #bundle data
+        experiment_data = {
             "groups": groups,
-            "recovered_weights_df": recovered_weights_df,
             "params": params,
-            "measure_dict": measure_dict, #indexed by a trait of interest first
-            "timestamp": timestamp
+            "timestamp": timestamp,
         }
 
-        
+        if recovered_weights_df is not None:
+            experiment_data["recovered_weights_df"] = recovered_weights_df
+        if measure_dict is not None:
+            experiment_data["measure_dict"] = measure_dict
+        if contagion_histories is not None:
+            experiment_data["contagion_histories"] = contagion_histories  # {group_id: np.ndarray}
+
         with open(filename, "wb") as f:
             pickle.dump(experiment_data, f)
 
         print(f"Experiment data saved to {filename}")
+
 
 
 

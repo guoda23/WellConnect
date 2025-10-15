@@ -25,6 +25,7 @@ class HMDhModel:
     """
 
     def __init__(self,
+                 seed,
                  alpha_i_mp=1, #global multiplier for spontaneous transitions (alpha) in worsening directions (H->M, H->D, M->D)
                  alpha_r_mp=1, #global multiplier for spontaneous transitions (alpha) towards recovery states (M->H, D->H, D->M)
                  beta_i_mp=1, #global multiplier for social contagion into worse states
@@ -46,6 +47,9 @@ class HMDhModel:
         - mtp_*_individual: per-transition multipliers for more fine-grained control
         - flat_*: optional fixed offsets to baseline probabilities
         """
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+
         self.state_attr = state_attr
         self.phq9_attr = phq9_attr
         self.history = []
@@ -92,6 +96,7 @@ class HMDhModel:
         else:
             return 2  # Depressed
 
+
     def initialize_agent_states(self):
         """
         Sets each agent’s depression state based on their PHQ-9 score.
@@ -137,12 +142,12 @@ class HMDhModel:
         d_to_h_prob = constants['d_h'][0] + num_d_h * constants['d_h'][1]
         d_to_m_prob = constants['d_m'][0] + num_d_m * constants['d_m'][1]
 
-        draw_h_m = np.random.random_sample(len(healthy_idx))
-        draw_h_d = np.random.random_sample(len(healthy_idx))
-        draw_m_h = np.random.random_sample(len(mild_idx))
-        draw_m_d = np.random.random_sample(len(mild_idx))
-        draw_d_h = np.random.random_sample(len(depressed_idx))
-        draw_d_m = np.random.random_sample(len(depressed_idx))
+        draw_h_m = self.rng.random(len(healthy_idx))
+        draw_h_d = self.rng.random(len(healthy_idx))
+        draw_m_h = self.rng.random(len(mild_idx))
+        draw_m_d = self.rng.random(len(mild_idx))
+        draw_d_h = self.rng.random(len(depressed_idx))
+        draw_d_m = self.rng.random(len(depressed_idx))
 
         state[healthy_idx[h_to_m_prob[healthy_idx] > draw_h_m]] = 1
         state[healthy_idx[h_to_d_prob[healthy_idx] > draw_h_d]] = 2

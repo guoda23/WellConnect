@@ -16,7 +16,7 @@ def linear_deterministic_homophily_function(agent1, agent2, weights, max_distanc
     normalized_total_distance = 0
     max_normalized_total_distance = sum(weights.values())
 
-    for attribute, weight in weights.items():
+    for attribute, weight in weights.items(): #ONLY consider attributes for which weights are specified
         value1 = getattr(agent1, attribute, None)
         value2 = getattr(agent2, attribute, None)
 

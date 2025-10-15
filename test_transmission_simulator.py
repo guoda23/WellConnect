@@ -1,73 +1,61 @@
-# temporary script to test the transmission simulator via a saved group
+# ───────────────────────────────
+# Quick HMDhModel test script
+# ───────────────────────────────
+import os
 import pickle
+import numpy as np
 import matplotlib.pyplot as plt
 from TransmissionSimulator import TransmissionSimulator
 
-# Load your saved experiment and pull out one group
-def load_group_from_pickle(pkl_path, idx=0):
+
+def load_groups_from_pickle(pkl_path):
+    """Load all groups from a saved experiment pickle."""
     with open(pkl_path, "rb") as f:
         data = pickle.load(f)
-    groups = data["groups"]
-    print(f"Loaded {len(groups)} groups; testing group #{idx}")
-    return groups[idx]
+    return data["groups"]
 
-def test_hmdh_model_on_group(group, steps=50):
-    print("\n--- Testing HMDhModel ---")
-    from TransmissionSimulator import TransmissionSimulator
 
-    sim = TransmissionSimulator(
-        model_type='HMDhModel',
-        # customize params here if needed
-    )
+def run_hmdh_on_group(group, steps=50, seed=1):
+    """Run HMDhModel simulation on one group."""
+    sim = TransmissionSimulator(model_type="HMDhModel", seed=seed)
     history, agents = sim.run(group, steps=steps)
+    return np.array(history)
 
-    # history should be shape (steps, 3): each row = [# healthy, # mild, # depressed]
-    H, M, D = history[:, 0], history[:, 1], history[:, 2]
 
-    # Plot
+def plot_group_dynamics(histories, title="HMDhModel Simulation"):
+    """Plot multiple group histories and their average trajectory."""
+    labels = ["Healthy", "Mild", "Depressed"]
+    colors = ["green", "orange", "red"]
+    steps = np.arange(histories[0].shape[0])
+
     plt.figure(figsize=(8, 5))
-    plt.plot(H, label="Healthy", color="green")
-    plt.plot(M, label="Mild", color="orange")
-    plt.plot(D, label="Depressed", color="red")
+
+    # plot each group faintly
+    for hist in histories:
+        for i, color in enumerate(colors):
+            plt.plot(steps, hist[:, i], color=color, alpha=0.2)
+
+    # mean trajectory
+    mean_hist = np.mean(histories, axis=0)
+    for i, (label, color) in enumerate(zip(labels, colors)):
+        plt.plot(steps, mean_hist[:, i], color=color, lw=2.5, label=label)
+
     plt.xlabel("Time step")
     plt.ylabel("Number of individuals")
-    plt.title("Population-level Depression States Over Time (HMDhModel)")
+    plt.title(title)
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 
-
-def test_voter_model_on_group(group, steps=5):
-    print("\n--- Testing Bounded Confidence Voter Model ---")
-    sim = TransmissionSimulator(
-        model_type='BoundedConfidenceVoterModel',
-        target_attr="PHQ9_Total",
-        threshold=0.8,
-        mu=0.2,
-        # brooding_weight=0.5,
-        # reflecting_weight=0.5
-    )
-    history, agents = sim.run(group, steps=steps)
-
-    for i, agent in enumerate(agents):
-        label = f'Agent {agent.agent_id}' if hasattr(agent, 'agent_id') else f'Agent {i}'
-        plt.plot(history[:, i], lw=1, label=label)
-
-    plt.xlabel("Time step")
-    plt.ylabel("PHQ-9 score")
-    plt.yticks([0, 5, 10, 15, 20, 27],
-               labels=["None", "Mild", "Moderate", "Mod. Severe", "Severe", "Max"])
-    plt.title("PHQ-9 Score Over Time (Voter Model)")
-    plt.legend(ncol=2, fontsize="small", loc='upper right')
-    plt.tight_layout()
-    plt.show()
-    # plt.savefig("voter_model_phq9_plot.png", dpi=300)
-    # print("Plot saved as voter_model_phq9_plot.png")
 
 if __name__ == "__main__":
-    PKL = "Experiments/transmission/batch_2025-10-10_12-34-39/seed_4/noise_0.2/experiment_run_1_target_e_1.361_weight_e_1.1568/experiment_2025-10-10_12-34-44.pkl"
-    group = load_group_from_pickle(PKL, idx=0)
+    # Path to one of your saved experiment .pkl files
+    PKL_PATH = "Experiments/transmission/batch_2025-10-13_11-33-42/seed_1/noise_0/experiment_run_1_target_e_0.0_weight_e_1.5850/experiment_2025-10-13_11-33-44.pkl"
 
-    test_hmdh_model_on_group(group, steps=50)
-    # test_voter_model_on_group(group, steps=10)
+    # Load and simulate
+    groups = load_groups_from_pickle(PKL_PATH)
+    all_histories = [run_hmdh_on_group(g, steps=100) for g in groups]
+
+    # Plot
+    plot_group_dynamics(all_histories, title="HMDhModel dynamics (seed 1, entropy 1.2955)")
