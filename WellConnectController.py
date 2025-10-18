@@ -94,7 +94,7 @@ class WellConnectController:
 
     def simulate_depression_dynamics(self, groups, seed, steps, model_type="HMDaModel"):
         """
-        Runs the depression transmission model (HMDaModel) on every group
+        Runs the depression transmission model (default HMDaModel) on every group
         and returns a dictionary mapping group_id -> simulation history (np.array of shape [steps, 3]).
         """
         contagion_sim = TransmissionSimulator(model_type=model_type, seed=seed)

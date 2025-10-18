@@ -1,12 +1,27 @@
 from TransmissionVisualizer import TransmissionVisualizer
 viz = TransmissionVisualizer(
-    batch_folder="Experiments/transmission/batch_2025-10-15_16-08-05"
+    batch_folder="Experiments/transmission/batch_2025-10-18_16-53-22" #Hill's
+    # batch_folder="Experiments/transmission/batch_2025-10-18_17-22-16" #van der Ende's
 )
 
 viz.load_experiment_data(noise_level=0.15)
 
+# line graph: number of transitions (each category) across network density
 # records = viz.extract_transition_data(use_density=True)
 # viz.plot_transitions(records, x_axis="density")
 
-# viz.plot_final_state_triangles()
-viz.plot_fraction_triangle_2_axes()
+
+# final count heatmaps:
+viz.plot_final_state_heatmap_panels()
+# final count across 3 axis triangle (dots)
+# viz.plot_final_state_triangles_3_axes() 
+# final fraction across 2 axis triangle (dots)
+# viz.plot_fraction_triangles_2_axes()
+
+
+
+# density heatmap
+# viz.plot_density_heatmap(state="final")
+# density heatmap (line across)
+viz.plot_density_triangle_2_axes(state="initial")
+

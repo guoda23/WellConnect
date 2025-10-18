@@ -15,7 +15,7 @@ def load_groups_from_pickle(pkl_path):
     return data["groups"]
 
 
-def run_hmdh_on_group(group, steps=50, seed=1):
+def run_hmdh_on_group(group, steps=20, seed=20):
     """Run HMDaModel simulation on one group."""
     sim = TransmissionSimulator(model_type="HMDaModel", seed=seed)
     history, agents = sim.run(group, steps=steps)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     # Load and simulate
     groups = load_groups_from_pickle(PKL_PATH)
-    all_histories = [run_hmdh_on_group(g, steps=100) for g in groups]
+    all_histories = [run_hmdh_on_group(g, steps=20) for g in groups]
 
     # Plot
     plot_group_dynamics(all_histories, title="HMDaModel dynamics (seed 1, entropy 1.2955)")

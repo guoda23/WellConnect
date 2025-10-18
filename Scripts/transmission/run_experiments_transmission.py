@@ -65,6 +65,7 @@ GROUP_FORMATION = cfg["group_formation"]
 HOMOPHILY_FUNCTION_NAME = cfg["homophily_function"]
 NOISE_STDS = cfg["noise_stds"]
 MODEL_STEPS = cfg["model_steps"]
+MODEL_TYPE = cfg.get("model_type")
 
 
 # ───────────────────────────────
@@ -138,7 +139,7 @@ for seed in SEEDS:
                     noise_std=noise_std
                 )
 
-                contagion_histories = controller.simulate_depression_dynamics(groups, seed=seed, steps=MODEL_STEPS, model_type="HMDaModel")
+                contagion_histories = controller.simulate_depression_dynamics(groups, seed=seed, steps=MODEL_STEPS, model_type=MODEL_TYPE)
 
 
                 params = dict(base_params) #copy base params

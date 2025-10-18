@@ -22,12 +22,15 @@ class TransmissionSimulator:
         **kwargs :
             Model-specific keyword arguments passed to the chosen model class.
         """
-        if model_type == 'HMDaModel':
+        if model_type == "HMDaModel":
             from transmission_models.HMDaModel import HMDaModel
             return HMDaModel(**kwargs)
-        elif model_type == 'BoundedConfidenceVoterModel':
+        elif model_type == "BoundedConfidenceVoterModel":
             from transmission_models.BoundedConfidenceVoterModel import BoundedConfidenceVoterModel
             return BoundedConfidenceVoterModel(**kwargs)
+        elif model_type == "AlcoholHMDaModel":
+            from transmission_models.AlcoholHMDaModel import AlcoholHMDaModel
+            return AlcoholHMDaModel(**kwargs)
         else:
             raise ValueError(f"Model type '{model_type}' is not recognized.")
         
