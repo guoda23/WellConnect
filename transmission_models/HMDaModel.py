@@ -45,6 +45,8 @@ class HMDaModel:
         self.p = dict(a_h=a_h, b_h=b_h, g_h=g_h,
                       a_d=a_d, b_d=b_d, g_d=g_d,
                       s_hd=s_hd, s_dh=s_dh)
+        
+        self.transition_log = []
 
     # ------------------------------------------------------------------
     def classify_depression_state(self, phq_score):
@@ -65,6 +67,22 @@ class HMDaModel:
             setattr(agent, self.state_attr, self.classify_depression_state(score))
 
     # ------------------------------------------------------------------
+    def log_transitions(self, old_states, new_states):
+        """
+        Compare arrays of old and new states and record all transitions.
+        Appends one dictionary of transition counts to self.transition_log.
+        """
+        state_names = {0: "H", 1: "M", 2: "D"}
+        step_transitions = {}
+
+        for old, new in zip(old_states, new_states):
+            if old != new:
+                label = f"{state_names[old]}→{state_names[new]}"
+                step_transitions[label] = step_transitions.get(label, 0) + 1
+
+        self.transition_log.append(step_transitions)
+    # ------------------------------------------------------------------    
+    
     def update_state(self):
         """Perform one weekly update according to Hill-style transition rules."""
         agents = list(self.g.nodes)
@@ -103,6 +121,8 @@ class HMDaModel:
         maskD = state == 2
         new_state[maskD & (draws[:,0] < p_dm)] = 1
         new_state[maskD & (draws[:,1] < p_dh)] = 0
+
+        self.log_transitions(state, new_state)
 
         # Commit updated states to agents
         for i, agent in enumerate(agents):

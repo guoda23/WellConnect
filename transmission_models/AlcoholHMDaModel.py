@@ -85,6 +85,24 @@ class AlcoholHMDaModel:
             'h_m_d': np.array([0.0271 * mtp_bi[3] + flat_bi]) / 239.2,
         }
 
+        self.transition_log = []
+
+
+    def log_transitions(self, old_states, new_states):
+        """
+        Compare arrays of old and new states and record all transitions.
+        Appends one dictionary of transition counts to self.transition_log.
+        """
+        state_names = {0: "H", 1: "M", 2: "D"}
+        step_transitions = {}
+
+        for old, new in zip(old_states, new_states):
+            if old != new:
+                label = f"{state_names[old]}→{state_names[new]}"
+                step_transitions[label] = step_transitions.get(label, 0) + 1
+
+        self.transition_log.append(step_transitions)
+
 
     def classify_depression_state(self, phq_score):
         """
@@ -118,6 +136,7 @@ class AlcoholHMDaModel:
         agents = list(self.g.nodes)
 
         state = np.array([getattr(agent, self.state_attr) for agent in agents])
+        old_state = state.copy() #for logging transitions
 
         healthy_idx = np.where(state == 0)[0]
         mild_idx = np.where(state == 1)[0]
@@ -160,6 +179,7 @@ class AlcoholHMDaModel:
         for i, agent in enumerate(agents):
             setattr(agent, self.state_attr, int(state[i]))
 
+        self.log_transitions(old_state, state)
 
     def run(self, group, steps=20):
         """

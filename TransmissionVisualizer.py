@@ -38,18 +38,37 @@ class TransmissionVisualizer:
     # ───────────────────────────────────────────
     # Helper: Count transitions
     # ───────────────────────────────────────────
-    def _count_transitions(self, history):
-        H, M, D = history[:, 0], history[:, 1], history[:, 2]
-        dH, dM, dD = np.diff(H), np.diff(M), np.diff(D)
-        transitions = {
-            "H→M": int(np.sum(np.maximum(-dH, 0))),
-            "H→D": int(np.sum(np.maximum(-dH - np.maximum(dM, 0), 0))),
-            "M→D": int(np.sum(np.maximum(-dM, 0))),
-            "M→H": int(np.sum(np.maximum(dH, 0))),
-            "D→M": int(np.sum(np.maximum(dM, 0))),
-            "D→H": int(np.sum(np.maximum(dH, 0))),
-        }
-        return transitions
+    def _count_transitions(self, exp):
+        """
+        Reads precomputed transition logs from the experiment data.
+        Returns total (summed) counts of each transition type across all groups.
+
+        Parameters
+        ----------
+        exp : dict
+            One loaded experiment dictionary (from .pkl)
+
+        Returns
+        -------
+        dict
+            Total transition counts like {'H→M': ..., 'M→D': ..., ...}
+        """
+        transitions_all = exp.get("transition_logs", {})
+        totals = {}
+
+        # transitions_all: {group_id: [ {H→M:3,...}, {M→H:1,...}, ... ]}
+        for group_id, steps in transitions_all.items():
+            for step_dict in steps:
+                for k, v in step_dict.items():
+                    totals[k] = totals.get(k, 0) + v
+
+        # Fill missing transition types with zeros to keep structure consistent
+        all_keys = ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]
+        for k in all_keys:
+            totals.setdefault(k, 0)
+
+        return totals
+
 
     # ───────────────────────────────────────────
     # Helper: Compute weighted density
@@ -116,10 +135,9 @@ class TransmissionVisualizer:
             # loop over groups
             for group in groups:
                 densities.append(self._calculate_density(group))
-                hist = contagion_histories.get(group.group_id)
-                if hist is not None:
-                    trans = self._count_transitions(hist)
-                    group_transitions.append(trans)
+                
+            trans = self._count_transitions(exp)
+            group_transitions.append(trans)
 
             if group_transitions:
                 avg_trans = {k: np.mean([t[k] for t in group_transitions]) for k in group_transitions[0]}

@@ -99,17 +99,19 @@ class WellConnectController:
         """
         contagion_sim = TransmissionSimulator(model_type=model_type, seed=seed)
         contagion_history_dict = {}
+        transition_log_dict = {}
 
         for group in groups:
             history, _ = contagion_sim.run(group, steps=steps)
             contagion_history_dict[group.group_id] = history
+            transition_log_dict[group.group_id] = contagion_sim.model.transition_log
 
-        return contagion_history_dict
+        return contagion_history_dict, transition_log_dict
     
 
     def save_experiment_data(self, groups, params, experiment_folder,
                             recovered_weights_df=None, measure_dict=None,
-                            contagion_histories=None):
+                            contagion_histories=None, transition_logs=None):
         
         os.makedirs(experiment_folder, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -127,6 +129,8 @@ class WellConnectController:
             experiment_data["measure_dict"] = measure_dict
         if contagion_histories is not None:
             experiment_data["contagion_histories"] = contagion_histories  # {group_id: np.ndarray}
+        if transition_logs is not None:
+            experiment_data["transition_logs"] = transition_logs  # {group_id: list of dicts}
 
         with open(filename, "wb") as f:
             pickle.dump(experiment_data, f)

@@ -1,7 +1,9 @@
 from TransmissionVisualizer import TransmissionVisualizer
 viz = TransmissionVisualizer(
-    batch_folder="Experiments/transmission/batch_2025-10-18_16-53-22" #Hill's
+    # batch_folder="Experiments/transmission/batch_2025-10-18_16-53-22" #Hill's
     # batch_folder="Experiments/transmission/batch_2025-10-18_17-22-16" #van der Ende's
+    # batch_folder = "Experiments/transmission/batch_2025-10-20_20-27-17" # new hill with transition log
+    batch_folder = "Experiments/transmission/batch_2025-10-20_20-51-09" # new van der Ende with transition log
 )
 
 viz.load_experiment_data(noise_level=0.15)
