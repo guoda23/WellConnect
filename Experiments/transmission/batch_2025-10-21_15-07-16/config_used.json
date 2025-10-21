@@ -1,0 +1,21 @@
+{
+  "experiment_name": "transmission",
+  "model_type": "HMDaModel",
+  "attributes": ["Age_tertiary", "EducationLevel_tertiary", "Gender_tertiary","PHQ9_Total", "PANCRS_TotalPositive", "PANCRS_TotalNegative", "PANCRS_FrequencyPositive", "PANCRS_FrequencyNegative"],
+  "max_distances": {
+    "Age_tertiary": 1,
+    "EducationLevel_tertiary": 1,
+    "Gender_tertiary": 1
+  },
+  "group_size": 30,
+  "num_groups": 8,
+  "group_formation": "multi-trait-entropy",
+  "homophily_function": "linear_stochastic",
+  "seeds": [1],
+  "target_entropy_list":   [0.0, 0.469, 0.7219, 0.8813, 0.9219, 0.971, 1.0, 1.1568, 1.2955, 1.3568, 1.361, 1.371, 1.4855, 1.5219, 1.571, 1.6855, 1.7219, 1.761, 1.771, 1.8464, 1.8955, 1.9219, 1.961, 1.971, 2.0464, 2.1219, 2.161, 2.171, 2.2464, 2.3219, 2.371, 2.4464, 2.5219, 2.6464, 2.7219, 2.8464, 2.9219, 3.1219, 3.3219],
+  "base_weights_list": [
+      {"Age_tertiary": 0.7, "EducationLevel_tertiary": 0.2, "Gender_tertiary": 0.1}
+  ],
+  "noise_stds": [0.15],
+  "model_steps": 500
+}

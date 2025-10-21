@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from panel import state
 
 class HMDaModel:
     """
@@ -104,7 +105,7 @@ class HMDaModel:
         p_dh = np.full_like(p_mh, p["s_dh"])        # Depressed → Healthy (superinfection)
 
         # Random draws for stochastic transitions
-        draws = self.rng.random((len(agents), 3))
+        draws = self.rng.random((len(agents), 2))
         new_state = state.copy()
 
         # Mild transitions
@@ -137,6 +138,9 @@ class HMDaModel:
             history (np.ndarray): time-series of counts [healthy, mild, depressed]
             agents (list): final agent objects
         """
+        self.transition_log = []
+        self.history = []
+
         self.g = group.network
         self.initialize_agent_states(group)
         agents = list(self.g.nodes)
@@ -149,4 +153,4 @@ class HMDaModel:
             self.history.append(counts)
             self.update_state()
 
-        return np.array(self.history), agents
+        return np.array(self.history), agents, self.transition_log

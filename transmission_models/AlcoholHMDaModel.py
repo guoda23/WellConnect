@@ -192,6 +192,8 @@ class AlcoholHMDaModel:
         - A history array of counts in each state at each time step
         - The list of final agent objects
         """
+        self.history = []
+        self.transition_log = []
 
         self.g = group.network
         self.initialize_agent_states()
@@ -206,4 +208,4 @@ class AlcoholHMDaModel:
             self.history.append(counts)
             self.update_state()
 
-        return np.array(self.history), agents
+        return np.array(self.history), agents, self.transition_log

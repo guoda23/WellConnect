@@ -102,9 +102,9 @@ class WellConnectController:
         transition_log_dict = {}
 
         for group in groups:
-            history, _ = contagion_sim.run(group, steps=steps)
+            history, agents, transition_log = contagion_sim.run(group, steps=steps)
             contagion_history_dict[group.group_id] = history
-            transition_log_dict[group.group_id] = contagion_sim.model.transition_log
+            transition_log_dict[group.group_id] = transition_log
 
         return contagion_history_dict, transition_log_dict
     
