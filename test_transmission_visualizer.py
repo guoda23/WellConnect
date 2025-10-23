@@ -4,20 +4,23 @@ viz = TransmissionVisualizer(
     # batch_folder="Experiments/transmission/batch_2025-10-18_17-22-16" #van der Ende's (50 steps!)
     # batch_folder = "Experiments/transmission/batch_2025-10-20_20-27-17" # new hill with transition log (20 steps!)
     # batch_folder = "Experiments/transmission/batch_2025-10-20_20-51-09" # new van der Ende with transition log (20 steps!)
-    batch_folder = "Experiments/transmission/batch_2025-10-21_14-54-02"
+    # batch_folder = "Experiments/transmission/batch_2025-10-21_14-54-02"
     # batch_folder = "Experiments/transmission/batch_2025-10-21_15-07-16" # longer runs (500 steps, group of 30)
+    # batch_folder = "Experiments/transmission/batch_2025-10-22_15-40-55" # 30 seeds
+    batch_folder = "Experiments/transmission/batch_2025-10-23_12-15-02" # fixed entropy (70 seeds)
+
 )
 
 viz.load_experiment_data(noise_level=0)
 
 # line graph: number of transitions (each category) across network density
 records = viz.extract_transition_data(use_density=True)
-# viz.plot_transitions(records, x_axis="density")
-viz.plot_normalized_transitions(records, x_axis="density")
+viz.plot_transitions(records, x_axis="density")
+# viz.plot_normalized_transitions(records, x_axis="density")
 
 
 # final count heatmaps:
-# viz.plot_final_state_heatmap_panels()
+viz.plot_final_state_heatmap_panels()
 # final count across 3 axis triangle (dots)
 # viz.plot_final_state_triangles_3_axes() 
 # final fraction across 2 axis triangle (dots)

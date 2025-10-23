@@ -109,14 +109,19 @@ class TransmissionVisualizer:
     # ───────────────────────────────────────────
     def extract_transition_data(self, use_density=False):
         """
-        Extracts per-group transition statistics including total and normalized transitions,
-        plus initial composition fractions. Does not require re-running experiments.
+        Computes per-cohort average transitions and adds either
+        'trait_entropy' or 'density' as x-axis variable.
+
+        Parameters
+        ----------
+        use_density : bool
+            If True, use network density on x-axis.
+            If False, use target trait entropy.
         """
         if self.experiment_data is None:
             raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
 
         records = []
-
         for _, exp in self.experiment_data.items():
             params = exp["params"]
             seed = params.get("seed")
@@ -124,97 +129,48 @@ class TransmissionVisualizer:
             contagion_histories = exp.get("contagion_histories", {})
             groups = exp.get("groups", [])
 
+            group_transitions = []
+            densities = []
+
+            # loop over groups
             for group in groups:
-                hist = contagion_histories.get(group.group_id)
-                if hist is None or len(hist) == 0:
-                    continue
+                densities.append(self._calculate_density(group))
 
-                initial, final = hist[0], hist[-1]
-                H0, M0, D0 = initial
-                total = H0 + M0 + D0
-                potential = H0 + M0  # possible new depressions
+            # total transitions (summed over all groups and steps)
+            trans = self._count_transitions(exp)
+            group_transitions.append(trans)
 
-                density = self._calculate_density(group)
-
-                # transitions across all steps for this group
-                log = exp["transition_logs"].get(group.group_id, [])
-                total_trans = sum(sum(d.values()) for d in log)
-                norm_trans = total_trans / potential if potential > 0 else np.nan
-
-                # store per-group record
+            if group_transitions:
+                avg_trans = {k: np.mean([t[k] for t in group_transitions]) for k in group_transitions[0]}
+                avg_density = np.mean(densities)
                 records.append({
                     "seed": seed,
                     "trait_entropy": target_entropy,
-                    "density": density,
-                    "total_transitions": total_trans,
-                    "normalized_transitions": norm_trans,
-                    "initial_H_frac": H0 / total,
-                    "initial_M_frac": M0 / total,
-                    "initial_D_frac": D0 / total,
+                    "density": avg_density,
+                    **avg_trans
                 })
 
         return records
 
 
+
     # ───────────────────────────────────────────
     # Plotting
     # ───────────────────────────────────────────
-    def plot_transitions(self, records, x_axis="trait_entropy", band=False):
+    def plot_transitions(self, records, x_axis="trait_entropy", band=True):
         """
-        Plot mean ± SD of transitions vs. chosen x-axis.
-        x_axis: "trait_entropy" or "density"
-        band:   False -> error bars; True -> shaded ±1 SD band
-        """
-        import pandas as pd
-        df = pd.DataFrame(records)
-        if x_axis not in ["trait_entropy", "density"]:
-            raise ValueError("x_axis must be 'trait_entropy' or 'density'")
-
-        # aggregate across seeds (records are already averaged across groups per cohort)
-        agg = df.groupby(x_axis).agg(
-            {t: ['mean', 'std'] for t in ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]}
-        )
-        agg.columns = [f"{t}_{stat}" for t, stat in agg.columns]
-        agg = agg.reset_index()
-
-        xs = agg[x_axis].values
-        trans = ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]
-
-        plt.figure(figsize=(10, 6))
-        for t in trans:
-            m = agg[f"{t}_mean"].values
-            s = agg[f"{t}_std"].values
-
-            if band:
-                plt.plot(xs, m, marker="o", label=t)
-                plt.fill_between(xs, m - s, m + s, alpha=0.2)
-            else:
-                plt.errorbar(xs, m, yerr=s, fmt='-o', capsize=4, label=t)
-
-        plt.xlabel("Network density" if x_axis == "density" else "Target trait entropy")
-        plt.ylabel("Average number of transitions (±1 SD across seeds)")
-        plt.title("Average Depression State Transitions (averaged across groups → seeds)")
-        plt.grid(True, alpha=0.3)
-        plt.legend()
-        # plt.ylim(20, 38)
-        plt.tight_layout()
-        plt.show()
-
-
-    def plot_normalized_transitions(self, records, x_axis="density", band=True):
-        """
-        Plot normalized (composition-controlled) transition activity vs. chosen x-axis.
-        Each group's total transitions are normalized by the number of agents who could
-        still become depressed (H0 + M0), controlling for initial composition effects.
-
+        Plot mean ± SD (shaded band) of transition counts vs. chosen x-axis.
+        Averages across seeds. If x_axis == "density", densities are rounded
+        to 3 decimals to ensure seeds with nearly identical densities are grouped.
+        
         Parameters
         ----------
         records : list[dict]
-            Output of extract_transition_data() (must include 'normalized_transitions').
+            Output of extract_transition_data().
         x_axis : str
-            'density' or 'trait_entropy'.
+            'trait_entropy' or 'density'
         band : bool
-            Whether to show shaded ±1 SD bands (True) or error bars (False).
+            Whether to show shaded ±1 SD bands (True) or error bars (False)
         """
         import pandas as pd
         import matplotlib.pyplot as plt
@@ -223,41 +179,47 @@ class TransmissionVisualizer:
 
         if x_axis not in ["trait_entropy", "density"]:
             raise ValueError("x_axis must be 'trait_entropy' or 'density'")
-        if "normalized_transitions" not in df.columns:
-            raise ValueError("Records must include 'normalized_transitions' field. "
-                             "Run extract_transition_data() after adding normalization.")
 
-        # Aggregate across seeds
-        agg = (
-            df.groupby(x_axis)
-              .agg(mean_norm=("normalized_transitions", "mean"),
-                   std_norm=("normalized_transitions", "std"))
-              .reset_index()
-        )
-
-        xs = agg[x_axis].values
-        mean_vals = agg["mean_norm"].values
-        std_vals = agg["std_norm"].values
-
-        plt.figure(figsize=(9, 6))
-
-        if band:
-            plt.plot(xs, mean_vals, marker="o", lw=2, color="tab:blue", label="Normalized transitions")
-            plt.fill_between(xs, mean_vals - std_vals, mean_vals + std_vals,
-                             color="tab:blue", alpha=0.25)
+        # ── Round densities to ensure averaging across seeds ────────────────
+        if x_axis == "density":
+            df["density_rounded"] = df["density"].round(3)
+            group_key = "density_rounded"
         else:
-            plt.errorbar(xs, mean_vals, yerr=std_vals, fmt='-o', capsize=4,
-                         color="tab:blue", label="Normalized transitions")
+            group_key = "trait_entropy"
 
+        # ── Aggregate across seeds ──────────────────────────────────────────
+        agg = (
+            df.groupby(group_key)
+            .agg({t: ['mean', 'std'] for t in ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]})
+        )
+        agg.columns = [f"{t}_{stat}" for t, stat in agg.columns]
+        agg = agg.reset_index()
+
+        # ── Prepare data for plotting ───────────────────────────────────────
+        xs = agg[group_key].values
+        trans = ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]
+
+        plt.figure(figsize=(10, 6))
+
+        for t in trans:
+            m = agg[f"{t}_mean"].values
+            s = agg[f"{t}_std"].values
+
+            if band:
+                plt.plot(xs, m, marker="o", label=t, lw=2)
+                plt.fill_between(xs, m - s, m + s, alpha=0.25)
+            else:
+                plt.errorbar(xs, m, yerr=s, fmt='-o', capsize=4, label=t)
+
+        # ── Labels and formatting ───────────────────────────────────────────
         xlabel = "Network density" if x_axis == "density" else "Target trait entropy"
         plt.xlabel(xlabel)
-        plt.ylabel("Normalized transition activity (±1 SD across seeds)")
-        plt.title("Composition-controlled transition dynamics")
+        plt.ylabel("Average number of transitions (±1 SD across seeds)")
+        plt.title("Average Depression State Transitions (averaged across groups → seeds)")
         plt.grid(True, alpha=0.3)
         plt.legend(frameon=False)
         plt.tight_layout()
         plt.show()
-
 
 
 
