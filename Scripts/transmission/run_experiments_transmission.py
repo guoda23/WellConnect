@@ -58,7 +58,8 @@ TARGET_ENTROPY_LIST = cfg["target_entropy_list"]
 # Controlled variables
 MAX_DISTANCES = cfg["max_distances"]
 ATTRIBUTES = cfg["attributes"]
-SEEDS = cfg["seeds"]
+SEEDS_GROUP_FORMATION = cfg["seeds_group_formation"]  #list of random seeds for group formation
+SEEDS_TRANSMISSION = cfg["seeds_transmission"]  #list of random seeds for transmission
 GROUP_SIZE = cfg["group_size"]
 NUM_GROUPS = cfg["num_groups"]  #number of groups to form in one cohort
 GROUP_FORMATION = cfg["group_formation"]
@@ -78,7 +79,9 @@ base_params = {
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
     'homophily_function': HOMOPHILY_FUNCTION_NAME,
-    'model_steps': MODEL_STEPS
+    'model_steps': MODEL_STEPS,
+    'model_type': MODEL_TYPE,
+    'seeds_transmission': SEEDS_TRANSMISSION
 }
 
 
@@ -101,7 +104,7 @@ shutil.copy2(CONFIG_PATH, batch_dir / "config_used.json")
 # ───────────────────────────────────────────
 
 # loop through each seed
-for seed in SEEDS:
+for seed in SEEDS_GROUP_FORMATION:
 
     print(f"\n=== Running seed {seed} ===")
 
@@ -110,7 +113,7 @@ for seed in SEEDS:
 
     #loop through each set of base weights and entropies
     for target_entropy in TARGET_ENTROPY_LIST:
-        controller = WellConnectController(data_path='data/preprocessed.csv',
+        controller = WellConnectController(data_path=DATA_PATH,
                                             group_size=GROUP_SIZE,
                                             attributes=ATTRIBUTES,
                                             max_distances=MAX_DISTANCES)
@@ -139,8 +142,7 @@ for seed in SEEDS:
                     noise_std=noise_std
                 )
 
-                contagion_histories, transition_logs = controller.simulate_depression_dynamics(groups, seed=seed, steps=MODEL_STEPS, model_type=MODEL_TYPE)
-
+                contagion_histories, transition_logs = controller.simulate_depression_dynamics(groups, seeds=SEEDS_TRANSMISSION, steps=MODEL_STEPS, model_type=MODEL_TYPE)
 
                 params = dict(base_params) #copy base params
                 #add run-specific params

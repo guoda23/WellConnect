@@ -25,7 +25,6 @@ class AlcoholHMDaModel:
     """
 
     def __init__(self,
-                 seed,
                  alpha_i_mp=1, #global multiplier for spontaneous transitions (alpha) in worsening directions (H->M, H->D, M->D)
                  alpha_r_mp=1, #global multiplier for spontaneous transitions (alpha) towards recovery states (M->H, D->H, D->M)
                  beta_i_mp=1, #global multiplier for social contagion into worse states
@@ -47,9 +46,6 @@ class AlcoholHMDaModel:
         - mtp_*_individual: per-transition multipliers for more fine-grained control
         - flat_*: optional fixed offsets to baseline probabilities
         """
-        self.seed = seed
-        self.rng = np.random.default_rng(seed)
-
         self.state_attr = state_attr
         self.phq9_attr = phq9_attr
         self.history = []
@@ -87,6 +83,9 @@ class AlcoholHMDaModel:
 
         self.transition_log = []
 
+        self.seed = None
+        self.rng = None
+
 
     def log_transitions(self, old_states, new_states):
         """
@@ -116,10 +115,9 @@ class AlcoholHMDaModel:
             return 2  # Depressed
 
 
-    def initialize_agent_states(self):
-        """
-        Sets each agent’s depression state based on their PHQ-9 score.
-        """
+    def initialize_agent_states(self, group):
+        """Assign initial depression state from PHQ-9 scores."""
+        self.g = group.network
         for agent in self.g.nodes:
             score = getattr(agent, self.phq9_attr)
             setattr(agent, self.state_attr, self.classify_depression_state(score))
@@ -181,7 +179,7 @@ class AlcoholHMDaModel:
 
         self.log_transitions(old_state, state)
 
-    def run(self, group, steps=20):
+    def run(self, group, seed, steps=20):
         """
         Runs the model for a number of steps on a Group object (which must have `.network` attribute).
 
@@ -194,9 +192,11 @@ class AlcoholHMDaModel:
         """
         self.history = []
         self.transition_log = []
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
 
         self.g = group.network
-        self.initialize_agent_states()
+        self.initialize_agent_states(group)
         agents = list(self.g.nodes)
         self.history = []
 

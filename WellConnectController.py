@@ -92,19 +92,38 @@ class WellConnectController:
         return measure_dict
     
 
-    def simulate_depression_dynamics(self, groups, seed, steps, model_type="HMDaModel"):
+    def simulate_depression_dynamics(self, groups, seeds, steps, model_type="HMDaModel"):
         """
-        Runs the depression transmission model (default HMDaModel) on every group
-        and returns a dictionary mapping group_id -> simulation history (np.array of shape [steps, 3]).
+        Runs the depression transmission model (default HMDaModel) on every group.
+
+        Args:
+            groups: list of Group objects
+            seeds: list of ints (for multiple runs)
+            steps: number of weeks
+            model_type: "HMDaModel" or "BoundedConfidenceVoterModel", etc.
+
+        Returns:
+            contagion_history_dict : {seed: {group_id: np.ndarray}}
+            transition_log_dict    : {seed: {group_id: list[dict]}}
         """
-        contagion_sim = TransmissionSimulator(model_type=model_type, seed=seed)
+        from TransmissionSimulator import TransmissionSimulator
+
+        contagion_sim = TransmissionSimulator(model_type=model_type)
         contagion_history_dict = {}
         transition_log_dict = {}
 
-        for group in groups:
-            history, agents, transition_log = contagion_sim.run(group, steps=steps)
-            contagion_history_dict[group.group_id] = history
-            transition_log_dict[group.group_id] = transition_log
+
+        for seed in seeds:
+            seed_histories = {}
+            seed_logs = {}
+
+            for group in groups:
+                history, agents, transition_log = contagion_sim.run(group, steps=steps, seed=seed)
+                seed_histories[group.group_id] = history
+                seed_logs[group.group_id] = transition_log
+
+            contagion_history_dict[seed] = seed_histories
+            transition_log_dict[seed] = seed_logs
 
         return contagion_history_dict, transition_log_dict
     
@@ -128,9 +147,10 @@ class WellConnectController:
         if measure_dict is not None:
             experiment_data["measure_dict"] = measure_dict
         if contagion_histories is not None:
-            experiment_data["contagion_histories"] = contagion_histories  # {group_id: np.ndarray}
+            experiment_data["contagion_histories"] = contagion_histories  # {seed: {group_id: np.ndarray}}
         if transition_logs is not None:
-            experiment_data["transition_logs"] = transition_logs  # {group_id: list of dicts}
+            experiment_data["transition_logs"] = transition_logs  # {seed: {group_id: list[dict]}}
+
 
         with open(filename, "wb") as f:
             pickle.dump(experiment_data, f)

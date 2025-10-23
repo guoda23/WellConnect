@@ -8,10 +8,11 @@
     "Gender_tertiary": 1
   },
   "group_size": 10,
-  "num_groups": 8,
+  "num_groups": 75,
   "group_formation": "multi-trait-entropy",
   "homophily_function": "linear_stochastic",
-  "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+  "seeds_group_formation": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+  "seeds_transmission": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
   "target_entropy_list":   [1.2955],
   "base_weights_list": [
       {"Age_tertiary": 0.7, "EducationLevel_tertiary": 0.2, "Gender_tertiary": 0.1}

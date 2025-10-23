@@ -29,7 +29,6 @@ class HMDaModel:
     """
 
     def __init__(self,
-                 seed,
                  # Hill’s yearly rates divided by 52 (weekly timescale)
                  a_h=0.18/52,  b_h=0.02/52,  g_h=0.088/52,
                  a_d=0.04/52,  b_d=0.04/52,  g_d=0.13/52,
@@ -37,8 +36,7 @@ class HMDaModel:
                  state_attr="depression_state",
                  phq9_attr="PHQ9_Total"):
 
-        self.seed = seed
-        self.rng = np.random.default_rng(seed)
+
         self.state_attr = state_attr
         self.phq9_attr = phq9_attr
         self.history = []
@@ -48,6 +46,10 @@ class HMDaModel:
                       s_hd=s_hd, s_dh=s_dh)
         
         self.transition_log = []
+
+        # initialized during the run
+        self.seed = None
+        self.rng = None
 
     # ------------------------------------------------------------------
     def classify_depression_state(self, phq_score):
@@ -61,6 +63,7 @@ class HMDaModel:
 
     # ------------------------------------------------------------------
     def initialize_agent_states(self, group):
+
         """Assign initial depression state from PHQ-9 scores."""
         self.g = group.network
         for agent in self.g.nodes:
@@ -130,7 +133,7 @@ class HMDaModel:
             setattr(agent, self.state_attr, int(new_state[i]))
 
     # ------------------------------------------------------------------
-    def run(self, group, steps=20):
+    def run(self, group, seed, steps=20):
         """
         Run the simulation for a number of weekly steps (default 20 weeks).
 
@@ -138,6 +141,8 @@ class HMDaModel:
             history (np.ndarray): time-series of counts [healthy, mild, depressed]
             agents (list): final agent objects
         """
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.transition_log = []
         self.history = []
 
