@@ -11,28 +11,19 @@ viz = TransmissionVisualizer(
     # batch_folder = "Experiments/transmission/batch_2025-10-22_15-40-55" # 30 seeds
     # batch_folder = "Experiments/transmission/batch_2025-10-23_12-15-02" # fixed entropy (70 seeds)
     # batch_folder = "Experiments/transmission/batch_2025-10-28_11-04-35" 
-    batch_folder = "Experiments/transmission/batch_2025-10-28_13-02-09"
+    batch_folder = "Experiments/transmission/batch_2025-10-28_13-39-47"
 
 )
 
 viz.load_experiment_data(noise_level=0.15)
 
-# final count heatmaps:
-# viz.plot_final_state_heatmap_panels()
-# final count across 3 axis triangle (dots)
-# viz.plot_final_state_triangles_3_axes() 
-# final fraction across 2 axis triangle (dots)
-# viz.plot_fraction_triangles_2_axes()
-
-
-
-viz.plot_relative_change_panels(mode="raw", normalize=True)
+# viz.plot_relative_change_panels(mode="raw", normalize=True)
 
 
 
 
 # density heatmap
-# viz.plot_density_heatmap(state="final")
+viz.plot_density_heatmap(state="final")
 # density heatmap (line across)
 # viz.plot_density_triangle_2_axes(state="initial")
 
