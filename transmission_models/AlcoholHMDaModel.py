@@ -199,7 +199,7 @@ class AlcoholHMDaModel:
         self.initialize_agent_states(group)
         agents = list(self.g.nodes)
         self.history = []
-
+        
         for _ in range(steps):
             counts = [0, 0, 0]
             for agent in agents:

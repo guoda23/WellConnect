@@ -118,7 +118,7 @@ class WellConnectController:
             seed_logs = {}
 
             for group in groups:
-                history, agents, transition_log = contagion_sim.run(group, steps=steps, seed=seed)
+                history, agents, transition_log = contagion_sim.run(group, seed=seed, steps=steps)
                 seed_histories[group.group_id] = history
                 seed_logs[group.group_id] = transition_log
 

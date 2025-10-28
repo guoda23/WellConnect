@@ -38,4 +38,4 @@ class TransmissionSimulator:
         """
         Runs the selected model and returns its output.
         """
-        return self.model.run(group, steps, seed)
+        return self.model.run(group, seed, steps)

@@ -36,41 +36,6 @@ class TransmissionVisualizer:
         return all_experiments
 
     # ───────────────────────────────────────────
-    # Helper: Count transitions
-    # ───────────────────────────────────────────
-    def _count_transitions(self, exp):
-        """
-        Reads precomputed transition logs from the experiment data.
-        Returns total (summed) counts of each transition type across all groups.
-
-        Parameters
-        ----------
-        exp : dict
-            One loaded experiment dictionary (from .pkl)
-
-        Returns
-        -------
-        dict
-            Total transition counts like {'H→M': ..., 'M→D': ..., ...}
-        """
-        transitions_all = exp.get("transition_logs", {})
-        totals = {}
-
-        # transitions_all: {group_id: [ {H→M:3,...}, {M→H:1,...}, ... ]}
-        for group_id, steps in transitions_all.items():
-            for step_dict in steps:
-                for k, v in step_dict.items():
-                    totals[k] = totals.get(k, 0) + v
-
-        # Fill missing transition types with zeros to keep structure consistent
-        all_keys = ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]
-        for k in all_keys:
-            totals.setdefault(k, 0)
-
-        return totals
-
-
-    # ───────────────────────────────────────────
     # Helper: Compute weighted density
     # ───────────────────────────────────────────
     def _calculate_density(self, group):
@@ -104,123 +69,134 @@ class TransmissionVisualizer:
         return total_weight / possible_edges
 
 
+
     # ───────────────────────────────────────────
-    # Extract Transition Data
+    # Plotting
     # ───────────────────────────────────────────
-    def extract_transition_data(self, use_density=False):
+
+    def plot_relative_change_panels(self, mode="raw", normalize=True, figsize=(15, 5), cmap="coolwarm"):
         """
-        Computes per-cohort average transitions and adds either
-        'trait_entropy' or 'density' as x-axis variable.
+        Plots three 2D heatmaps (Healthy, Mild, Depressed) showing the relative change
+        between initial and final proportions of each state across all groups.
+
+        X-axis: initial fraction (or count) of Depressed individuals
+        Y-axis: initial fraction (or count) of Mildly Depressed individuals
+        Color: relative change of each state
 
         Parameters
         ----------
-        use_density : bool
-            If True, use network density on x-axis.
-            If False, use target trait entropy.
+        mode : {"raw", "std", "counts"}
+            Determines what is shown in the heatmap:
+                "raw"   → mean relative change (default)
+                "std"   → standard deviation of relative change
+                "counts"→ number of samples aggregated at that grid cell
+        normalize : bool
+            If True, use fractions (0–1) instead of raw counts.
+        figsize : tuple
+            Figure size for the three subplots.
+        cmap : str
+            Colormap for the heatmaps.
         """
         if self.experiment_data is None:
             raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
 
         records = []
-        for _, exp in self.experiment_data.items():
-            params = exp["params"]
-            seed = params.get("seed")
-            target_entropy = params.get("target_entropy")
+        eps = 1e-6
+
+        # ─── Collect group-level data ──────────────────────────────────────
+        for exp in self.experiment_data.values():
             contagion_histories = exp.get("contagion_histories", {})
             groups = exp.get("groups", [])
 
-            group_transitions = []
-            densities = []
+            for g in groups:
+                runs = contagion_histories.get(g.group_id)
+                if runs is None or len(runs) == 0:
+                    continue
 
-            # loop over groups
-            for group in groups:
-                densities.append(self._calculate_density(group))
+                # Handle nested dicts: {seed: array}
+                if isinstance(runs, dict):
+                    runs = list(runs.values())
 
-            # total transitions (summed over all groups and steps)
-            trans = self._count_transitions(exp)
-            group_transitions.append(trans)
+                arr = np.array(runs)
 
-            if group_transitions:
-                avg_trans = {k: np.mean([t[k] for t in group_transitions]) for k in group_transitions[0]}
-                avg_density = np.mean(densities)
-                records.append({
-                    "seed": seed,
-                    "trait_entropy": target_entropy,
-                    "density": avg_density,
-                    **avg_trans
-                })
+                # Skip if empty or malformed
+                if arr.size == 0:
+                    continue
 
-        return records
+                # Handle multiple stochastic runs: (n_runs, timesteps, 3)
+                if arr.ndim == 3:
+                    mean_hist = np.mean(arr, axis=0)
+                # Single run: (timesteps, 3)
+                elif arr.ndim == 2:
+                    mean_hist = arr
+                # Single state vector (3,) → treat as no change
+                elif arr.ndim == 1 and arr.shape[0] == 3:
+                    mean_hist = np.stack([arr, arr])
+                else:
+                    continue
 
+                initial, final = mean_hist[0], mean_hist[-1]
+                total_i, total_f = np.sum(initial), np.sum(final)
+                if total_i == 0 or total_f == 0:
+                    continue
 
+                H0, M0, D0 = initial / total_i if normalize else initial
+                Hf, Mf, Df = final / total_f if normalize else final
 
-    # ───────────────────────────────────────────
-    # Plotting
-    # ───────────────────────────────────────────
-    def plot_transitions(self, records, x_axis="trait_entropy", band=True):
-        """
-        Plot mean ± SD (shaded band) of transition counts vs. chosen x-axis.
-        Averages across seeds. If x_axis == "density", densities are rounded
-        to 3 decimals to ensure seeds with nearly identical densities are grouped.
-        
-        Parameters
-        ----------
-        records : list[dict]
-            Output of extract_transition_data().
-        x_axis : str
-            'trait_entropy' or 'density'
-        band : bool
-            Whether to show shaded ±1 SD bands (True) or error bars (False)
-        """
-        import pandas as pd
-        import matplotlib.pyplot as plt
+                dH = (Hf - H0) / (H0 + eps)
+                dM = (Mf - M0) / (M0 + eps)
+                dD = (Df - D0) / (D0 + eps)
 
-        df = pd.DataFrame(records)
+                records.append((M0, D0, dH, dM, dD))
 
-        if x_axis not in ["trait_entropy", "density"]:
-            raise ValueError("x_axis must be 'trait_entropy' or 'density'")
+        if not records:
+            raise ValueError("No valid contagion histories found in experiment data.")
 
-        # ── Round densities to ensure averaging across seeds ────────────────
-        if x_axis == "density":
-            df["density_rounded"] = df["density"].round(3)
-            group_key = "density_rounded"
-        else:
-            group_key = "trait_entropy"
+        # ─── Create DataFrame and aggregate ─────────────────────────────────
+        df = pd.DataFrame(records, columns=["M0", "D0", "dH", "dM", "dD"])
 
-        # ── Aggregate across seeds ──────────────────────────────────────────
-        agg = (
-            df.groupby(group_key)
-            .agg({t: ['mean', 'std'] for t in ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]})
-        )
-        agg.columns = [f"{t}_{stat}" for t, stat in agg.columns]
-        agg = agg.reset_index()
+        aggfunc_map = {"raw": "mean", "std": "std", "counts": "count"}
+        if mode not in aggfunc_map:
+            raise ValueError("mode must be one of: 'raw', 'std', 'counts'")
+        aggfunc = aggfunc_map[mode]
 
-        # ── Prepare data for plotting ───────────────────────────────────────
-        xs = agg[group_key].values
-        trans = ["H→M", "H→D", "M→D", "M→H", "D→M", "D→H"]
+        pivots = {
+            "Healthy":   pd.pivot_table(df, values="dH", index="M0", columns="D0", aggfunc=aggfunc),
+            "Mild":      pd.pivot_table(df, values="dM", index="M0", columns="D0", aggfunc=aggfunc),
+            "Depressed": pd.pivot_table(df, values="dD", index="M0", columns="D0", aggfunc=aggfunc),
+        }
 
-        plt.figure(figsize=(10, 6))
+        # ─── Plot the three heatmaps ───────────────────────────────────────
+        fig, axes = plt.subplots(1, 3, figsize=figsize, sharex=True, sharey=True)
+        # vmin, vmax = -0.1, 0.1
+        for ax, (title, pivot) in zip(axes, pivots.items()):
+            im = ax.imshow(
+                pivot.values,
+                origin="lower",
+                cmap=cmap,
+                aspect="auto",
+                # vmin=vmin, vmax=vmax,
+                extent=[
+                    pivot.columns.min(), pivot.columns.max(),
+                    pivot.index.min(), pivot.index.max()
+                ]
+            )
 
-        for t in trans:
-            m = agg[f"{t}_mean"].values
-            s = agg[f"{t}_std"].values
+            ax.set_title(f"{title} ({mode})", pad=15)
+            ax.set_xlabel("Initial fraction Depressed" if normalize else "Initial count Depressed")
+            ax.set_ylabel("Initial fraction Mildly Depressed" if normalize else "Initial count Mildly Depressed")
 
-            if band:
-                plt.plot(xs, m, marker="o", label=t, lw=2)
-                plt.fill_between(xs, m - s, m + s, alpha=0.25)
-            else:
-                plt.errorbar(xs, m, yerr=s, fmt='-o', capsize=4, label=t)
+            cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            cbar_label = {
+                "raw": "Mean relative change",
+                "std": "Std of relative change",
+                "counts": "Sample count"
+            }[mode]
+            cbar.set_label(cbar_label)
 
-        # ── Labels and formatting ───────────────────────────────────────────
-        xlabel = "Network density" if x_axis == "density" else "Target trait entropy"
-        plt.xlabel(xlabel)
-        plt.ylabel("Average number of transitions (±1 SD across seeds)")
-        plt.title("Average Depression State Transitions (averaged across groups → seeds)")
-        plt.grid(True, alpha=0.3)
-        plt.legend(frameon=False)
+        plt.suptitle(f"Relative Change by Initial Group Composition ({mode})", fontsize=14, y=1.03)
         plt.tight_layout()
         plt.show()
-
 
 
     def plot_final_state_heatmap_panels(self, normalize=True, figsize=(15, 5), cmap="plasma"):
