@@ -179,17 +179,13 @@ class AlcoholHMDaModel:
 
         self.log_transitions(old_state, state)
 
-    def run(self, group, seed, steps=20):
-        """
-        Runs the model for a number of steps on a Group object (which must have `.network` attribute).
+    def _count_states(self, agents):
+        counts = [0, 0, 0]
+        for agent in agents:
+            counts[getattr(agent, self.state_attr)] += 1
+        return counts
 
-        Parameters:
-        - group: Group object containing a networkx graph as `group.network`
-        - steps: Number of simulation steps 
-        Returns:
-        - A history array of counts in each state at each time step
-        - The list of final agent objects
-        """
+    def run(self, group, seed, steps=20):
         self.history = []
         self.transition_log = []
         self.seed = seed
@@ -198,14 +194,13 @@ class AlcoholHMDaModel:
         self.g = group.network
         self.initialize_agent_states(group)
         agents = list(self.g.nodes)
-        self.history = []
-        
+
+        # record t=0
+        self.history = [self._count_states(agents)]
+
+        # iterate times specified, recording after each update
         for _ in range(steps):
-            counts = [0, 0, 0]
-            for agent in agents:
-                s = getattr(agent, self.state_attr)
-                counts[s] += 1
-            self.history.append(counts)
             self.update_state()
+            self.history.append(self._count_states(agents))
 
         return np.array(self.history), agents, self.transition_log
