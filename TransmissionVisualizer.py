@@ -478,47 +478,21 @@ class TransmissionVisualizer:
     def plot_stacked_phq9_distributions(
         self,
         traits,
-        phq9_col="PHQ9_Total",
         csv_path="data/preprocessed.csv",
-        normalize=False, 
-        output_folder=None
+        phq9_col="PHQ9_Total",
+        output_folder=None,
     ):
         """
-        Plots stacked bar charts for multiple traits showing the distribution 
-        of each trait across PHQ-9 depression categories (Mild / Moderate / Severe).
-
-        Parameters
-        ----------
-        traits : list[str]
-            List of trait/column names to plot (e.g. ['gender', 'age_tertiary', 'education_tertiary']).
-        phq9_col : str
-            Column name for PHQ-9 scores (default: 'PHQ9_Total').
-        csv_path : str
-            Path to the dataset.
-        normalize : bool
-            If True, show proportions (each bar sums to 1). If False, show raw counts.
+        Plots stacked bar charts for multiple demographic traits showing
+        raw counts of PHQ-9 severity categories (Mild, Moderate, Severe).
         """
 
-
-
-        # ────────────────────────────────────────────────
-        # Helper: prettify names for x-axis labels
-        # ────────────────────────────────────────────────
-        def prettify(name: str) -> str:
-            parts = name.split("_")
-            parts = [p for p in parts if p.lower() != "tertiary"]
-            base = re.sub(r"(?<!^)(?=[A-Z])", " ", parts[0]).strip().title()
-
-            if base.lower().startswith("education"):
-                base = "Education"
-            if len(parts) > 1:
-                cat = " ".join([p.capitalize() for p in parts[1:]])
-                return f"{base}: {cat}"
-            else:
-                return base.capitalize()
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        from pathlib import Path
 
         # ────────────────────────────────────────────────
-        # Style settings
+        # Style settings (centralized)
         # ────────────────────────────────────────────────
         style = {
             "axes.titlesize": 24,
@@ -527,51 +501,61 @@ class TransmissionVisualizer:
             "ytick.labelsize": 18,
             "legend.fontsize": 16,
             "figure.titlesize": 25,
-            "color_palette": ["#81C784", "#FFD54F", "#E57373"],  # mild → moderate → severe
+            "color_palette": ["#81C784", "#FFD54F", "#E57373"],  # Mild → Moderate → Severe
+            "figure.figsize_unit": (8, 6.5),
         }
 
         # ────────────────────────────────────────────────
-        # Load and prepare data
+        # Category orders (confirmed)
         # ────────────────────────────────────────────────
-        df = pd.read_csv(csv_path)
-        if phq9_col not in df.columns:
-            raise ValueError(f"Column '{phq9_col}' not found in dataset.")
+        category_orders = {
+            "Age_tertiary": ["Young", "Mid", "Older"],
+            "EducationLevel_tertiary": ["Low", "Medium", "High"],
+            "Gender_tertiary": ["Female", "Male", "Other"],
+        }
+        state_order = ["Mild", "Moderate", "Severe"]
 
+        # ────────────────────────────────────────────────
+        # Load and classify
+        # ────────────────────────────────────────────────
+        usecols = traits + [phq9_col]
+        df = pd.read_csv(csv_path, usecols=usecols)
         df["PHQ9_Category"] = df[phq9_col].apply(self.classify_phq9)
         df = df[df["PHQ9_Category"] != "Unknown"]
 
-        # Custom order of x-axis categories (ascending, exact labels)
-        category_orders = {
-            "age_tertiary": ["young", "mid", "older"], 
-            "education_tertiary": ["Low", "Medium", "High"],
-            "gender": ["Male", "Female", "Other"],
-        }
+        # Normalize casing per trait
+        if "Age_tertiary" in df.columns:
+            df["Age_tertiary"] = df["Age_tertiary"].str.title()
+        if "EducationLevel_tertiary" in df.columns:
+            df["EducationLevel_tertiary"] = df["EducationLevel_tertiary"].str.title()
+        if "Gender_tertiary" in df.columns:
+            df["Gender_tertiary"] = df["Gender_tertiary"].str.title()
 
         # ────────────────────────────────────────────────
-        # Create subplots
+        # Create figure and axes
         # ────────────────────────────────────────────────
         num_traits = len(traits)
-        fig, axes = plt.subplots(1, num_traits, figsize=(8 * num_traits, 6.5))
+        fig, axes = plt.subplots(
+            1, num_traits, figsize=(style["figure.figsize_unit"][0] * num_traits, style["figure.figsize_unit"][1])
+        )
         if num_traits == 1:
             axes = [axes]
 
         for ax, trait in zip(axes, traits):
-            if trait not in df.columns:
-                ax.set_visible(False)
-                continue
+            # Group and order
+            counts = (
+                df.groupby([trait, "PHQ9_Category"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(columns=state_order, fill_value=0)
+            )
 
-            # Respect your preferred order
             if trait in category_orders:
-                df[trait] = pd.Categorical(df[trait],
-                                        categories=category_orders[trait],
-                                        ordered=True)
+                order = category_orders[trait]
+                counts = counts.loc[[x for x in order if x in counts.index]]
 
-            # Group and optionally normalize
-            counts = df.groupby([trait, "PHQ9_Category"]).size().unstack(fill_value=0)
-            data_to_plot = counts.div(counts.sum(axis=1), axis=0) if normalize else counts
-
-            # Plot stacked bars
-            data_to_plot.plot(
+            # Plot
+            counts.plot(
                 kind="bar",
                 stacked=True,
                 ax=ax,
@@ -581,48 +565,46 @@ class TransmissionVisualizer:
                 legend=False,
             )
 
-            # Prettify x labels
-            new_labels = [lbl.get_text().capitalize() for lbl in ax.get_xticklabels()]
-            ax.set_xticklabels(new_labels, rotation=30, ha="right", fontsize=style["xtick.labelsize"])
-
-            # Titles and axis labels
-            ax.set_title(prettify(trait), fontsize=style["axes.titlesize"], pad=10)
+            # Style
+            ax.set_title(
+                trait.replace("_tertiary", "").replace("Level", ""),
+                fontsize=style["axes.titlesize"],
+                pad=10,
+            )
             ax.set_xlabel("", fontsize=style["axes.labelsize"])
-            ax.set_ylabel("Proportion" if normalize else "Count", fontsize=style["axes.labelsize"])
+            ax.set_ylabel("Count", fontsize=style["axes.labelsize"], labelpad=15)
+            ax.tick_params(axis="x", rotation=30, labelsize=style["xtick.labelsize"])
             ax.tick_params(axis="y", labelsize=style["ytick.labelsize"])
 
         # ────────────────────────────────────────────────
-        # Shared legend (right side, wrapped title)
+        # Shared legend and layout
         # ────────────────────────────────────────────────
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(
             handles,
             labels,
-            title="Depression\nsymptom\nseverity",  # wrapped neatly
+            title="Depression\nSeverity",
             loc="center right",
-            bbox_to_anchor=(0.99, 0.5),             # closer to center
+            bbox_to_anchor=(0.99, 0.5),
             fontsize=style["legend.fontsize"],
             title_fontsize=style["legend.fontsize"],
         )
 
-        # ────────────────────────────────────────────────
-        # Title and layout adjustments
-        # ────────────────────────────────────────────────
         fig.suptitle(
-            "Trait Distributions by Depression Symptom Severity",
+            "Trait Distributions by Depression Severity",
             fontsize=style["figure.titlesize"],
-            y=0.98,  # lower title position (closer to plots)
+            y=0.97,
         )
-
-        # Adjust spacing to avoid any overlaps
         plt.tight_layout(rect=[0.02, 0, 0.9, 0.94])
         plt.subplots_adjust(wspace=0.25)
 
-        # ─── Optional export ────────────────────────────────────────────────
+        # ────────────────────────────────────────────────
+        # Save optional
+        # ────────────────────────────────────────────────
         if output_folder:
             output_folder = Path(output_folder)
             output_folder.mkdir(parents=True, exist_ok=True)
-            save_path = output_folder / f"trait_distributions_by_depression_state.png"
+            save_path = output_folder / "trait_distributions_by_depression_state.png"
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"Figure saved to: {save_path}")
 
