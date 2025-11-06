@@ -38,7 +38,7 @@ class TransmissionVisualizer:
     # ───────────────────────────────────────────
     # Helper: Compute weighted density
     # ───────────────────────────────────────────
-    def _calculate_density(self, group, phq9_attr="PHQ9_Total", mode="all"):
+    def _calculate_density(self, group, phq9_attr="PHQ9_Total", mode="All"):
         """
         Computes the weighted network density (mean tie strength) for an undirected,
         fully connected network with edge weights in [0, 1].
@@ -65,7 +65,7 @@ class TransmissionVisualizer:
             return 0.0
 
         # Optional: compute only cross-state density
-        if mode == "cross":
+        if mode == "Cross":
             total_weight = 0.0
             count = 0
             for a1, a2, d in G.edges(data=True):
@@ -102,16 +102,20 @@ class TransmissionVisualizer:
         Plots three 2D heatmaps (Mild, Moderate, Severe) showing the relative change
         between initial and final proportions of each state across all groups.
 
-        If 'output_folder' is provided, saves the figure as 'relative_change_{mode}.png'
-        inside that folder.
+        Supported modes:
+            • "Mean" — mean relative change across groups
+            • "Std"  — standard deviation of relative change across groups
         """
+
+        import pandas as pd
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from pathlib import Path
 
         if self.experiment_data is None:
             raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
 
         records = []
-        eps = 1e-6
-
         dep_variances = []
         all_histories = []
 
@@ -160,13 +164,12 @@ class TransmissionVisualizer:
                 dep_variances.append((g.group_id, dep_var))
                 all_histories.append((g.group_id, arr_norm))
 
-
         if not records:
             raise ValueError("No valid contagion histories found in experiment data.")
 
         # ─── Create DataFrame and aggregate ─────────────────────────────────
         df = pd.DataFrame(records, columns=["Mo0", "S0", "dMi", "dMo", "dS"])
-        aggfunc_map = {"Mean": "mean", "Std": "std", "Counts": "count"}
+        aggfunc_map = {"Mean": "mean", "Std": "std"}
         aggfunc = aggfunc_map.get(mode, "mean")
 
         pivots = {
@@ -175,11 +178,9 @@ class TransmissionVisualizer:
             "Severe":    pd.pivot_table(df, values="dS",  index="Mo0", columns="S0", aggfunc=aggfunc),
         }
 
-
         # ─── Plot the three heatmaps ───────────────────────────────────────
         fig, axes = plt.subplots(1, 3, figsize=figsize, sharex=True, sharey=True)
 
-        # adjust all plotting sizes here
         style = {
             "axes.titlesize": 18,
             "axes.labelsize": 16,
@@ -191,7 +192,6 @@ class TransmissionVisualizer:
             "figure.titlesize": 20,
         }
 
-        # vmax, vmin = 0.008, -0.008
         vmax, vmin = 0.025, 0
         for ax, (title, pivot) in zip(axes, pivots.items()):
             im = ax.imshow(
@@ -235,12 +235,9 @@ class TransmissionVisualizer:
 
         plt.show()
 
-
         # ─── Inspect groups contributing to highest variance cell ───────────────────────────
-        if mode in {"Std", "Var"}:
+        if mode in {"Std"}:
             pivot = pivots["Severe"]
-
-            # find cell with highest variance
             max_idx = np.unravel_index(np.nanargmax(pivot.values), pivot.values.shape)
             max_M0 = pivot.index[max_idx[0]]
             max_D0 = pivot.columns[max_idx[1]]
@@ -252,7 +249,6 @@ class TransmissionVisualizer:
             for exp in self.experiment_data.values():
                 contagion_histories = exp.get("contagion_histories", {})
                 groups = exp.get("groups", [])
-
                 for g in groups:
                     runs = contagion_histories.get(g.group_id)
                     if runs is None or len(runs) == 0:
@@ -260,7 +256,6 @@ class TransmissionVisualizer:
 
                     if isinstance(runs, dict):
                         runs = list(runs.values())
-
                     arr = np.array(runs)
                     if arr.ndim == 3:
                         mean_hist = np.mean(arr, axis=0)
@@ -283,6 +278,107 @@ class TransmissionVisualizer:
                 start = hist[0]
                 end = hist[-1]
                 print(f"Group {gid}: start = {np.round(start, 3)}, end = {np.round(end, 3)}")
+
+    def plot_group_count_distribution(
+        self,
+        normalize=True,
+        figsize=(7, 6),
+        cmap="plasma",
+        output_folder=None,
+    ):
+        """
+        Plots a single 2D heatmap showing how many groups occupy each
+        region of the initial composition space (Mo0 vs S0).
+
+        This replaces the 'Counts' mode from plot_relative_change_panels().
+        """
+
+        if self.experiment_data is None:
+            raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
+
+        records = []
+
+        # ─── Collect group-level data ───────────────────────────────
+        for exp in self.experiment_data.values():
+            contagion_histories = exp.get("contagion_histories", {})
+            groups = exp.get("groups", [])
+
+            for g in groups:
+                runs = contagion_histories.get(g.group_id)
+                if runs is None or len(runs) == 0:
+                    continue
+
+                if isinstance(runs, dict):
+                    runs = list(runs.values())
+
+                arr = np.array(runs)
+                if arr.size == 0:
+                    continue
+
+                if arr.ndim == 3:
+                    mean_hist = np.mean(arr, axis=0)
+                elif arr.ndim == 2:
+                    mean_hist = arr
+                elif arr.ndim == 1 and arr.shape[0] == 3:
+                    mean_hist = np.stack([arr, arr])
+                else:
+                    continue
+
+                initial = mean_hist[0]
+                total = np.sum(initial)
+                if total == 0:
+                    continue
+
+                Mi0, Mo0, S0 = initial / total if normalize else initial
+                records.append((Mo0, S0))
+
+        if not records:
+            raise ValueError("No valid groups found for count distribution plot.")
+
+        # ─── Aggregate counts ───────────────────────────────────────
+        df = pd.DataFrame(records, columns=["Mo0", "S0"])
+        df["Mo_rounded"] = df["Mo0"].round(3)
+        df["S_rounded"] = df["S0"].round(3)
+        pivot_counts = pd.pivot_table(
+            df, values="Mo0", index="Mo_rounded", columns="S_rounded", aggfunc="count"
+        )
+
+        # ─── Plot ──────────────────────────────────────────────────
+        fig, ax = plt.subplots(figsize=figsize)
+        im = ax.imshow(
+            pivot_counts.values,
+            origin="lower",
+            cmap=cmap,
+            aspect="auto",
+            extent=[
+                pivot_counts.columns.min(),
+                pivot_counts.columns.max(),
+                pivot_counts.index.min(),
+                pivot_counts.index.max(),
+            ],
+        )
+
+        ax.set_title("Group Count Distribution by Initial Composition", fontsize=18, pad=12)
+        ax.set_xlabel("Initial fraction Severely Depressed", fontsize=15)
+        ax.set_ylabel("Initial fraction Moderately Depressed", fontsize=15)
+        ax.tick_params(axis="x", labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
+
+        cbar = plt.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
+        cbar.set_label("Number of groups", fontsize=13)
+        cbar.ax.tick_params(labelsize=12)
+
+        plt.tight_layout()
+
+        if output_folder:
+            output_folder = Path(output_folder)
+            output_folder.mkdir(parents=True, exist_ok=True)
+            save_path = output_folder / "group_count_distribution.png"
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            print(f"Figure saved to: {save_path}")
+
+        plt.show()
+
 
 
 
@@ -330,15 +426,21 @@ class TransmissionVisualizer:
         return combined_path
 
 
-    def plot_density_heatmap(self, state="initial", normalize=True, figsize=(15, 6),
-                            cmap="viridis", output_folder=None, mode="all"):
+    def plot_density_heatmap(self, state="initial", normalize=True, figsize=(15, 7),
+                            cmap="coolwarm", output_folder=None, mode="All",
+                            vmax_mean=None, vmax_std=None,
+                            vmin_mean=None, vmin_std=None):
         """
         Plots side-by-side 2D heatmaps:
             • Left  = mean network density
             • Right = standard deviation of density
-        as a function of initial or final group composition.
+        
+        mode:
+            "All"   → density of all ties
+            "Cross" → density of ties between different severity states
+            "Ratio" → Cross / All (relative cross-tie share)
 
-        Automatically adjusts axis limits to data (no forced 0–1 range).
+        as a function of initial or final group composition.
         """
 
         if self.experiment_data is None:
@@ -376,7 +478,15 @@ class TransmissionVisualizer:
                 Mo = comp[1] / total
                 S = comp[2] / total
 
-                density = self._calculate_density(g, mode=mode)
+                if mode == "Ratio":
+                    cross = self._calculate_density(g, mode="Cross")
+                    total = self._calculate_density(g, mode="All")
+                    eps = 1e-6
+                    density = cross / (total + eps)
+
+                else:
+                    density = self._calculate_density(g, mode=mode)
+
                 records.append((Mo, S, density))
 
         if not records:
@@ -401,22 +511,28 @@ class TransmissionVisualizer:
         titles = ["Mean Network Density", "Std Network Density"]
         pivots = [pivot_mean, pivot_std]
 
-        # STYLE SETTINGS — consistent with relative change panels
         style = {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 12,
-            "ytick.labelsize": 12,
-            "cbar.labelsize": 12,
-            "cbar.ticklength": 6,
+            "axes.titlesize": 20,
+            "axes.labelsize": 18,
+            "xtick.labelsize": 14,
+            "ytick.labelsize": 14,
+            "cbar.labelsize": 14,
+            "cbar.ticklength": 8,
             "cbar.tickwidth": 1.2,
-            "figure.titlesize": 20,
+            "figure.titlesize": 22,
         }
 
         for ax, pivot, title in zip(axes, pivots, titles):
-            vmin = pivot.min().min()
-            vmax = pivot.max().max()
-            vmax = 0.9
+            # set per plot vmax, vmin if provided
+            if title.startswith("Mean"):
+                vmax = vmax_mean if vmax_mean is not None else pivot.max().max()
+                vmin = vmin_mean if vmin_mean is not None else pivot.min().min()
+            elif title.startswith("Std"):
+                vmax = vmax_std if vmax_std is not None else pivot.max().max()
+                vmin = vmin_std if vmin_std is not None else pivot.min().min()
+            else:
+                vmax = pivot.max().max()
+                vmin = pivot.min().min()
 
             im = ax.imshow(
                 pivot.values,
@@ -449,7 +565,12 @@ class TransmissionVisualizer:
                                 length=style["cbar.ticklength"],
                                 width=style["cbar.tickwidth"])
 
-        plt.suptitle(f"Mean Network Density and Std by Group Composition ({mode} ties)",
+        if mode == "Ratio":
+            title_prefix = "Cross-Tie Share"
+        else:
+            title_prefix = f"{mode} Ties"
+
+        plt.suptitle(f"{title_prefix}: Mean and Std Network Density by Group Composition",
                     fontsize=style["figure.titlesize"], y=1)
         plt.tight_layout()
 
@@ -473,6 +594,54 @@ class TransmissionVisualizer:
             return "Moderate"
         else:
             return "Severe"
+
+    def combine_density_heatmaps(self, output_folder, spacing=60, bg_color=(255, 255, 255)):
+        """
+        Combines the 'Cross' and 'All' network density heatmaps into one vertically
+        stacked image (Cross on top, All below).
+
+        Parameters
+        ----------
+        output_folder : str or Path
+            Folder where the 'density_heatmap_initial_Cross.png' and
+            'density_heatmap_initial_All.png' (or 'final_...') files are located.
+        spacing : int, optional
+            Vertical space (in pixels) between the two images.
+        bg_color : tuple, optional
+            Background color for the combined image (RGB), default = white.
+        """
+        from PIL import Image
+        from pathlib import Path
+
+        output_folder = Path(output_folder)
+        cross_path = output_folder / "density_heatmap_initial_Cross.png"
+        all_path = output_folder / "density_heatmap_initial_All.png"
+        combined_path = output_folder / "density_heatmap_combined.png"
+
+        # ─── Check both exist ─────────────────────────────────────────────
+        if not cross_path.exists() or not all_path.exists():
+            raise FileNotFoundError(
+                f"Missing one or both required images:\n"
+                f"  {cross_path if cross_path.exists() else '[missing]'}\n"
+                f"  {all_path if all_path.exists() else '[missing]'}"
+            )
+
+        # ─── Open and combine ─────────────────────────────────────────────
+        img_cross = Image.open(cross_path)
+        img_all = Image.open(all_path)
+
+        width = max(img_cross.width, img_all.width)
+        height = img_cross.height + img_all.height + spacing
+
+        combined = Image.new("RGB", (width, height), bg_color)
+        combined.paste(img_cross, (0, 0))
+        combined.paste(img_all, (0, img_cross.height + spacing))
+
+        combined.save(combined_path)
+        print(f"Combined density heatmap saved to: {combined_path}")
+
+        return combined_path
+
 
 
     def plot_stacked_phq9_distributions(

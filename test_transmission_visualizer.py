@@ -16,15 +16,43 @@ viz.load_experiment_data(noise_level=0.15)
 
 # viz.combine_relative_change_plots("Results/transmission/")
 
-# # density heatmap
+# viz.plot_group_count_distribution(output_folder="Results/transmission/")
+
+# density heatmap
 # viz.plot_density_heatmap(
 #     state="initial",
-#     output_folder="Results/transmission/even",
-#     mode="all"
+#     output_folder="Results/transmission", #TODO: add /even for even weights
+#     mode="All",
+#     vmax_mean=0.85,
+#     vmax_std=0.85,
+#     # vmin_mean=0.0,
+#     vmin_std=0.0
 # )
 
+# viz.plot_density_heatmap(
+#     state="initial",
+#     output_folder="Results/transmission", #TODO: add /even for even weights
+#     mode="Cross",
+#     vmax_mean=0.425,
+#     vmax_std=0.425,
+#     # vmin_mean=0.0,
+#     vmin_std=0.0
+# )
 
-viz.plot_stacked_phq9_distributions(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'],
-                                    output_folder="Results/transmission")
+viz.plot_density_heatmap(
+    state="initial",
+    output_folder="Results/transmission", #TODO: add /even for even weights
+    mode="Ratio",
+    # vmax_mean=0.425,
+    # vmax_std=0.425,
+    # vmin_mean=0.0,
+    # vmin_std=0.0
+)
+
+# viz.combine_density_heatmaps("Results/transmission/")
+
+
+# viz.plot_stacked_phq9_distributions(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'],
+#                                     output_folder="Results/transmission")
 
 
