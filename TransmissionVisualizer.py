@@ -1,15 +1,11 @@
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
-from torch import mode
 from tqdm import tqdm
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
-import numpy as np
 from PIL import Image, ImageOps
-import seaborn as sns
 import re
 
 
@@ -42,7 +38,7 @@ class TransmissionVisualizer:
     # ───────────────────────────────────────────
     # Helper: Compute weighted density
     # ───────────────────────────────────────────
-    def _calculate_density(self, group):
+    def _calculate_density(self, group, phq9_attr="PHQ9_Total", mode="all"):
         """
         Computes the weighted network density (mean tie strength) for an undirected,
         fully connected network with edge weights in [0, 1].
@@ -57,7 +53,7 @@ class TransmissionVisualizer:
         ----------
         group : Group
             Object containing a NetworkX undirected graph with 'weight' attributes on edges.
-
+        more: 
         Returns
         -------
         float
@@ -68,6 +64,28 @@ class TransmissionVisualizer:
         if n <= 1:
             return 0.0
 
+        # Optional: compute only cross-state density
+        if mode == "cross":
+            total_weight = 0.0
+            count = 0
+            for a1, a2, d in G.edges(data=True):
+                phq1 = getattr(a1, phq9_attr, None)
+                phq2 = getattr(a2, phq9_attr, None)
+                if phq1 is None or phq2 is None:
+                    continue
+
+                s1 = self.classify_phq9(phq1)
+                s2 = self.classify_phq9(phq2)
+                if s1 != s2:
+                    total_weight += d.get("weight", 0.0)
+                    count += 1
+
+            if count == 0:
+                return 0.0
+            return total_weight / count
+
+
+        #all edge weights
         total_weight = sum(d.get("weight", 0.0) for _, _, d in G.edges(data=True))
         possible_edges = n * (n - 1) / 2  # undirected
         return total_weight / possible_edges
@@ -81,7 +99,7 @@ class TransmissionVisualizer:
     def plot_relative_change_panels(self, mode="Mean", normalize=True, figsize=(15, 6),
                                     cmap="coolwarm", output_folder=None):
         """
-        Plots three 2D heatmaps (Healthy, Mild, Depressed) showing the relative change
+        Plots three 2D heatmaps (Mild, Moderate, Severe) showing the relative change
         between initial and final proportions of each state across all groups.
 
         If 'output_folder' is provided, saves the figure as 'relative_change_{mode}.png'
@@ -128,15 +146,15 @@ class TransmissionVisualizer:
                 if total_i == 0 or total_f == 0:
                     continue
 
-                H0, M0, D0 = initial / total_i if normalize else initial
-                Hf, Mf, Df = final / total_f if normalize else final
+                Mi0, Mo0, S0 = initial / total_i if normalize else initial
+                MiF, MoF, SF = final / total_f if normalize else final
 
-                dH = (Hf - H0)
-                dM = (Mf - M0)
-                dD = (Df - D0)
+                dMi = (MiF - Mi0)
+                dMo = (MoF - Mo0)
+                dS = (SF - S0)
 
-                records.append((M0, D0, dH, dM, dD))
-                
+                records.append((Mo0, S0, dMi, dMo, dS))
+
                 arr_norm = arr / np.sum(arr, axis=1, keepdims=True) if normalize else arr
                 dep_var = np.var(arr_norm[:, 2])
                 dep_variances.append((g.group_id, dep_var))
@@ -147,15 +165,16 @@ class TransmissionVisualizer:
             raise ValueError("No valid contagion histories found in experiment data.")
 
         # ─── Create DataFrame and aggregate ─────────────────────────────────
-        df = pd.DataFrame(records, columns=["M0", "D0", "dH", "dM", "dD"])
+        df = pd.DataFrame(records, columns=["Mo0", "S0", "dMi", "dMo", "dS"])
         aggfunc_map = {"Mean": "mean", "Std": "std", "Counts": "count"}
         aggfunc = aggfunc_map.get(mode, "mean")
 
         pivots = {
-            "Healthy":   pd.pivot_table(df, values="dH", index="M0", columns="D0", aggfunc=aggfunc),
-            "Mild":      pd.pivot_table(df, values="dM", index="M0", columns="D0", aggfunc=aggfunc),
-            "Depressed": pd.pivot_table(df, values="dD", index="M0", columns="D0", aggfunc=aggfunc),
+            "Mild":      pd.pivot_table(df, values="dMi", index="Mo0", columns="S0", aggfunc=aggfunc),
+            "Moderate":  pd.pivot_table(df, values="dMo", index="Mo0", columns="S0", aggfunc=aggfunc),
+            "Severe":    pd.pivot_table(df, values="dS",  index="Mo0", columns="S0", aggfunc=aggfunc),
         }
+
 
         # ─── Plot the three heatmaps ───────────────────────────────────────
         fig, axes = plt.subplots(1, 3, figsize=figsize, sharex=True, sharey=True)
@@ -172,15 +191,16 @@ class TransmissionVisualizer:
             "figure.titlesize": 20,
         }
 
-        # vmax, vmin = 0.06, 0
+        # vmax, vmin = 0.008, -0.008
+        vmax, vmin = 0.025, 0
         for ax, (title, pivot) in zip(axes, pivots.items()):
             im = ax.imshow(
                 pivot.values,
                 origin="lower",
                 cmap=cmap,
                 aspect="auto",
-                # vmin=vmin,
-                # vmax=vmax,
+                vmin=vmin,
+                vmax=vmax,
                 extent=[
                     pivot.columns.min(), pivot.columns.max(),
                     pivot.index.min(), pivot.index.max(),
@@ -188,9 +208,9 @@ class TransmissionVisualizer:
             )
 
             ax.set_title(f"{title}", pad=15, fontsize=style["axes.titlesize"])
-            ax.set_xlabel("Initial fraction Depressed" if normalize else "Initial count Depressed",
+            ax.set_xlabel("Initial fraction Severely Depressed" if normalize else "Initial count Severely Depressed",
                         fontsize=style["axes.labelsize"])
-            ax.set_ylabel("Initial fraction Mildly Depressed" if normalize else "Initial count Mildly Depressed",
+            ax.set_ylabel("Initial fraction Moderately Depressed" if normalize else "Initial count Moderately Depressed",
                         fontsize=style["axes.labelsize"])
 
             ax.tick_params(axis="x", labelsize=style["xtick.labelsize"])
@@ -218,14 +238,14 @@ class TransmissionVisualizer:
 
         # ─── Inspect groups contributing to highest variance cell ───────────────────────────
         if mode in {"Std", "Var"}:
-            pivot = pivots["Depressed"]
+            pivot = pivots["Severe"]
 
             # find cell with highest variance
             max_idx = np.unravel_index(np.nanargmax(pivot.values), pivot.values.shape)
             max_M0 = pivot.index[max_idx[0]]
             max_D0 = pivot.columns[max_idx[1]]
 
-            print(f"\nHighest variance cell in 'Depressed':")
+            print(f"\nHighest variance cell in 'Severe':")
             print(f"   M0 = {max_M0:.3f}, D0 = {max_D0:.3f}")
 
             matching_groups = []
@@ -254,10 +274,8 @@ class TransmissionVisualizer:
                     if total_i == 0:
                         continue
 
-                    H0, M0, D0 = initial / total_i if normalize else initial
-
-                    # match to cell
-                    if np.isclose(M0, max_M0, atol=1e-3) and np.isclose(D0, max_D0, atol=1e-3):
+                    Mi0, Mo0, S0 = initial / total_i if normalize else initial
+                    if np.isclose(Mo0, max_M0, atol=1e-3) and np.isclose(S0, max_D0, atol=1e-3):
                         matching_groups.append((g.group_id, mean_hist))
 
             print(f"\nGroups contributing to that cell: {len(matching_groups)} found.\n")
@@ -313,7 +331,7 @@ class TransmissionVisualizer:
 
 
     def plot_density_heatmap(self, state="initial", normalize=True, figsize=(15, 6),
-                            cmap="viridis", output_folder=None):
+                            cmap="viridis", output_folder=None, mode="all"):
         """
         Plots side-by-side 2D heatmaps:
             • Left  = mean network density
@@ -355,28 +373,28 @@ class TransmissionVisualizer:
                 if total == 0:
                     continue
 
-                M = comp[1] / total if normalize else comp[1]
-                D = comp[2] / total if normalize else comp[2]
+                Mo = comp[1] / total
+                S = comp[2] / total
 
-                density = self._calculate_density(g)
-                records.append((M, D, density))
+                density = self._calculate_density(g, mode=mode)
+                records.append((Mo, S, density))
 
         if not records:
             raise ValueError("No valid groups found for density heatmap.")
 
         # ─── Aggregate densities ─────────────────────────────────────────
-        df = pd.DataFrame(records, columns=["M", "D", "Density"])
-        df["M_rounded"] = df["M"].round(3)
-        df["D_rounded"] = df["D"].round(3)
+        df = pd.DataFrame(records, columns=["Mo", "S", "Density"])
+        df["Mo_rounded"] = df["Mo"].round(3)
+        df["S_rounded"] = df["S"].round(3)
 
-        grouped = df.groupby(["M_rounded", "D_rounded"])["Density"]
+        grouped = df.groupby(["Mo_rounded", "S_rounded"])["Density"]
         df_mean = grouped.mean().reset_index(name="MeanDensity")
         df_std = grouped.std(ddof=0).reset_index(name="StdDensity")
 
         pivot_mean = pd.pivot_table(df_mean, values="MeanDensity",
-                                    index="M_rounded", columns="D_rounded", aggfunc="mean")
+                                    index="Mo_rounded", columns="S_rounded", aggfunc="mean")
         pivot_std = pd.pivot_table(df_std, values="StdDensity",
-                                index="M_rounded", columns="D_rounded", aggfunc="mean")
+                                    index="Mo_rounded", columns="S_rounded", aggfunc="mean")
 
         # ─── Plot side-by-side heatmaps ────────────────────────────────
         fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=True, sharey=True)
@@ -398,6 +416,7 @@ class TransmissionVisualizer:
         for ax, pivot, title in zip(axes, pivots, titles):
             vmin = pivot.min().min()
             vmax = pivot.max().max()
+            vmax = 0.9
 
             im = ax.imshow(
                 pivot.values,
@@ -419,8 +438,8 @@ class TransmissionVisualizer:
             ax.set_ylim(pivot.index.min(), pivot.index.max())
 
             ax.set_title(title, pad=15, fontsize=style["axes.titlesize"])
-            ax.set_xlabel(f"{state.capitalize()} fraction Depressed", fontsize=style["axes.labelsize"])
-            ax.set_ylabel(f"{state.capitalize()} fraction Mildly Depressed", fontsize=style["axes.labelsize"])
+            ax.set_xlabel(f"{state.capitalize()} fraction Severely Depressed", fontsize=style["axes.labelsize"])
+            ax.set_ylabel(f"{state.capitalize()} fraction Moderately Depressed", fontsize=style["axes.labelsize"])
 
             ax.tick_params(axis="x", labelsize=style["xtick.labelsize"])
             ax.tick_params(axis="y", labelsize=style["ytick.labelsize"])
@@ -430,7 +449,7 @@ class TransmissionVisualizer:
                                 length=style["cbar.ticklength"],
                                 width=style["cbar.tickwidth"])
 
-        plt.suptitle(f"Mean Network Density and Std by Group Composition",
+        plt.suptitle(f"Mean Network Density and Std by Group Composition ({mode} ties)",
                     fontsize=style["figure.titlesize"], y=1)
         plt.tight_layout()
 
@@ -438,11 +457,22 @@ class TransmissionVisualizer:
         if output_folder:
             output_folder = Path(output_folder)
             output_folder.mkdir(parents=True, exist_ok=True)
-            save_path = output_folder / f"density_heatmap_{state}.png"
+            save_path = output_folder / f"density_heatmap_{state}_{mode}.png"
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"Figure saved to: {save_path}")
 
         plt.show()
+
+    # ────────────────────────────────────────────────
+    # Helper: classify PHQ-9
+    # ────────────────────────────────────────────────
+    def classify_phq9(self, score):
+        if score <= 9:
+            return "Mild"
+        elif score <= 14:
+            return "Moderate"
+        else:
+            return "Severe"
 
 
     def plot_stacked_phq9_distributions(
@@ -469,18 +499,7 @@ class TransmissionVisualizer:
             If True, show proportions (each bar sums to 1). If False, show raw counts.
         """
 
-        # ────────────────────────────────────────────────
-        # Helper: classify PHQ-9
-        # ────────────────────────────────────────────────
-        def classify_phq9(score):
-            if pd.isna(score):
-                return "Unknown"
-            elif score <= 9:
-                return "Mild"
-            elif score <= 14:
-                return "Moderate"
-            else:
-                return "Severe"
+
 
         # ────────────────────────────────────────────────
         # Helper: prettify names for x-axis labels
@@ -518,12 +537,12 @@ class TransmissionVisualizer:
         if phq9_col not in df.columns:
             raise ValueError(f"Column '{phq9_col}' not found in dataset.")
 
-        df["PHQ9_Category"] = df[phq9_col].apply(classify_phq9)
+        df["PHQ9_Category"] = df[phq9_col].apply(self.classify_phq9)
         df = df[df["PHQ9_Category"] != "Unknown"]
 
         # Custom order of x-axis categories (ascending, exact labels)
         category_orders = {
-            "age_tertiary": ["mid", "older", "young"],  # lowercase in your data
+            "age_tertiary": ["young", "mid", "older"], 
             "education_tertiary": ["Low", "Medium", "High"],
             "gender": ["Male", "Female", "Other"],
         }

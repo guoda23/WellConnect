@@ -11,9 +11,9 @@ class AlcoholHMDaModel:
     Each agent is a node in a weighted networkx graph (`group.network`) and must have a PHQ-9 score 
     (attribute name defined by `phq9_attr`). At initialization, the model classifies agents into 
     three states based on their PHQ-9 score:
-        0 = Healthy
-        1 = Mildly Depressed
-        2 = Depressed
+        0 = Mild
+        1 = Moderate
+        2 = Severe
 
     The model uses empirically derived transition parameters from Van der Ende et al. (2024), 
     calibrated on an unweighted network, to simulate:
@@ -25,27 +25,18 @@ class AlcoholHMDaModel:
     """
 
     def __init__(self,
-                 alpha_i_mp=1, #global multiplier for spontaneous transitions (alpha) in worsening directions (H->M, H->D, M->D)
-                 alpha_r_mp=1, #global multiplier for spontaneous transitions (alpha) towards recovery states (M->H, D->H, D->M)
-                 beta_i_mp=1, #global multiplier for social contagion into worse states
-                 beta_r_mp=1, #global multiplier for social contagion into recovery states
-                 mtp_a_i_individual=np.array([1, 1, 1]), # individual scaling global multipliers for spontaneous transitions in worsening directions (H->M, H->D, M->D)
-                 mtp_a_r_individual=np.array([1, 1, 1]), # individual scaling global multipliers for spontaneous transitions towards recovery states (M->H, D->H, D->M)
-                 mtp_b_i_individual=np.array([1, 1, 1, 1]), # individual scaling global multipliers for social contagion into worse states (H->M, H->D, M->D, D->M)
-                 mtp_b_r_individual=np.array([1, 1, 1]), # individual scaling global multipliers for social contagion into recovery states (M->H, D->H, D->M)
-                 flat_ai=0, flat_ar=0, flat_bi=0, flat_br=0, #control over base probabilities (intercept)
+                 alpha_i_mp=0, # Set to 0 to isolate social influences!
+                 alpha_r_mp=0, # Set to 0 to isolate social influences!
+                 beta_i_mp=1,
+                 beta_r_mp=1,
+                 mtp_a_i_individual=np.array([1, 1, 1]),
+                 mtp_a_r_individual=np.array([1, 1, 1]),
+                 mtp_b_i_individual=np.array([1, 1, 1, 1]),
+                 mtp_b_r_individual=np.array([1, 1, 1]),
+                 flat_ai=0, flat_ar=0, flat_bi=0, flat_br=0,
                  state_attr="depression_state",
                  phq9_attr="PHQ9_Total"):
         
-        """
-        Initialize model parameters and transition constants.
-
-        Parameters are grouped into:
-        - alpha_*: spontaneous transition rates
-        - beta_*: social influence multipliers
-        - mtp_*_individual: per-transition multipliers for more fine-grained control
-        - flat_*: optional fixed offsets to baseline probabilities
-        """
         self.state_attr = state_attr
         self.phq9_attr = phq9_attr
         self.history = []
@@ -70,15 +61,14 @@ class AlcoholHMDaModel:
         mtp_bi = self.beta_i_mp * self.mtp_b_i_individual
         mtp_br = self.beta_r_mp * self.mtp_b_r_individual
 
-        self.constants = { #constants refer to Van der Ende's figure 3 in the paper (they only included significant ones)
-            #gives weekly rates when divided by 4.6*52 (rates were given per 4.6 years in the paper)
-            'h_m': np.array([0.2108 * mtp_ai[0] + flat_ai, 0.0202 * mtp_bi[0] + flat_bi]) / 239.2,
-            'h_d': np.array([0.0081 * mtp_ai[1] + flat_ai, 0.0000 * mtp_bi[1] + flat_bi]) / 239.2,
-            'm_h': np.array([0.1942 * mtp_ar[0] + flat_ar, 0.0348 * mtp_br[0] + flat_br]) / 239.2,
-            'm_d': np.array([0.0839 * mtp_ai[2] + flat_ai, 0.0357 * mtp_bi[2] + flat_bi]) / 239.2,
-            'd_h': np.array([0.0558 * mtp_ar[1] + flat_ar, 0.0190 * mtp_br[1] + flat_br]) / 239.2,
-            'd_m': np.array([0.2997 * mtp_ar[2] + flat_ar, 0.0000 * mtp_br[2] + flat_br]) / 239.2,
-            'h_m_d': np.array([0.0271 * mtp_bi[3] + flat_bi]) / 239.2,
+        self.constants = { 
+            'mi_mo': np.array([0.2108 * mtp_ai[0] + flat_ai, 0.0202 * mtp_bi[0] + flat_bi]) / 239.2,
+            'mi_s': np.array([0.0081 * mtp_ai[1] + flat_ai, 0.0000 * mtp_bi[1] + flat_bi]) / 239.2,
+            'mo_mi': np.array([0.1942 * mtp_ar[0] + flat_ar, 0.0348 * mtp_br[0] + flat_br]) / 239.2,
+            'mo_s': np.array([0.0839 * mtp_ai[2] + flat_ai, 0.0357 * mtp_bi[2] + flat_bi]) / 239.2,
+            's_mi': np.array([0.0558 * mtp_ar[1] + flat_ar, 0.0190 * mtp_br[1] + flat_br]) / 239.2,
+            's_mo': np.array([0.2997 * mtp_ar[2] + flat_ar, 0.0000 * mtp_br[2] + flat_br]) / 239.2,
+            'mi_mo_s': np.array([0.0271 * mtp_bi[3] + flat_bi]) / 239.2,
         }
 
         self.transition_log = []
@@ -88,11 +78,7 @@ class AlcoholHMDaModel:
 
 
     def log_transitions(self, old_states, new_states):
-        """
-        Compare arrays of old and new states and record all transitions.
-        Appends one dictionary of transition counts to self.transition_log.
-        """
-        state_names = {0: "H", 1: "M", 2: "D"}
+        state_names = {0: "Mi", 1: "Mo", 2: "S"}
         step_transitions = {}
 
         for old, new in zip(old_states, new_states):
@@ -104,19 +90,15 @@ class AlcoholHMDaModel:
 
 
     def classify_depression_state(self, phq_score):
-        """
-        Categorizes an agent into 0 (Healthy), 1 (Mild), or 2 (Depressed) based on PHQ-9 score.
-        """
-        if phq_score < 5:
-            return 0  # Healthy
-        elif phq_score < 10:
-            return 1  # Mild
+        if phq_score < 10:
+            return 0  # Mild
+        elif phq_score < 15:
+            return 1  # Moderate
         else:
-            return 2  # Depressed
+            return 2  # Severe
 
 
     def initialize_agent_states(self, group):
-        """Assign initial depression state from PHQ-9 scores."""
         self.g = group.network
         for agent in self.g.nodes:
             score = getattr(agent, self.phq9_attr)
@@ -124,66 +106,62 @@ class AlcoholHMDaModel:
 
 
     def update_state(self):
-        """
-        Performs a single simulation step:
-        - Computes how many neighbors each agent has in each state (weighted)
-        - Calculates transition probabilities using α and β values
-        - Applies stochastic updates based on those probabilities
-        """
         constants = self.constants
         agents = list(self.g.nodes)
 
         state = np.array([getattr(agent, self.state_attr) for agent in agents])
-        old_state = state.copy() #for logging transitions
+        old_state = state.copy()
 
-        healthy_idx = np.where(state == 0)[0]
-        mild_idx = np.where(state == 1)[0]
-        depressed_idx = np.where(state == 2)[0]
+        mild_idx = np.where(state == 0)[0]
+        moderate_idx = np.where(state == 1)[0]
+        severe_idx = np.where(state == 2)[0]
 
-        vec_healthy = (state == 0).astype(float)
-        vec_mild = (state == 1).astype(float)
-        vec_depressed = (state == 2).astype(float)
+        vec_mild = (state == 0).astype(float)
+        vec_moderate = (state == 1).astype(float)
+        vec_severe = (state == 2).astype(float)
 
         A = nx.to_numpy_array(self.g, nodelist=agents, weight="weight")
 
-        num_h_m = A @ vec_mild
-        num_h_d = A @ vec_depressed
-        num_m_h = A @ vec_healthy
-        num_m_d = A @ vec_depressed
-        num_d_h = A @ vec_healthy
-        num_d_m = A @ vec_mild
+        num_mi_mo = A @ vec_moderate
+        num_mi_s = A @ vec_severe
+        num_mo_mi = A @ vec_mild
+        num_mo_s = A @ vec_severe
+        num_s_mi = A @ vec_mild
+        num_s_mo = A @ vec_moderate
 
-        h_to_m_prob = constants['h_m'][0] + num_h_m * constants['h_m'][1] + num_h_d * constants['h_m_d']
-        h_to_d_prob = constants['h_d'][0] + num_h_d * constants['h_d'][1]
-        m_to_h_prob = constants['m_h'][0] + num_m_h * constants['m_h'][1]
-        m_to_d_prob = constants['m_d'][0] + num_m_d * constants['m_d'][1]
-        d_to_h_prob = constants['d_h'][0] + num_d_h * constants['d_h'][1]
-        d_to_m_prob = constants['d_m'][0] + num_d_m * constants['d_m'][1]
+        mi_to_mo_prob = constants['mi_mo'][0] + num_mi_mo * constants['mi_mo'][1] + num_mi_s * constants['mi_mo_s']
+        mi_to_s_prob = constants['mi_s'][0] + num_mi_s * constants['mi_s'][1]
+        mo_to_mi_prob = constants['mo_mi'][0] + num_mo_mi * constants['mo_mi'][1]
+        mo_to_s_prob = constants['mo_s'][0] + num_mo_s * constants['mo_s'][1]
+        s_to_mi_prob = constants['s_mi'][0] + num_s_mi * constants['s_mi'][1]
+        s_to_mo_prob = constants['s_mo'][0] + num_s_mo * constants['s_mo'][1]
 
-        draw_h_m = self.rng.random(len(healthy_idx))
-        draw_h_d = self.rng.random(len(healthy_idx))
-        draw_m_h = self.rng.random(len(mild_idx))
-        draw_m_d = self.rng.random(len(mild_idx))
-        draw_d_h = self.rng.random(len(depressed_idx))
-        draw_d_m = self.rng.random(len(depressed_idx))
+        draw_mi_mo = self.rng.random(len(mild_idx))
+        draw_mi_s = self.rng.random(len(mild_idx))
+        draw_mo_mi = self.rng.random(len(moderate_idx))
+        draw_mo_s = self.rng.random(len(moderate_idx))
+        draw_s_mi = self.rng.random(len(severe_idx))
+        draw_s_mo = self.rng.random(len(severe_idx))
 
-        state[healthy_idx[h_to_m_prob[healthy_idx] > draw_h_m]] = 1
-        state[healthy_idx[h_to_d_prob[healthy_idx] > draw_h_d]] = 2
-        state[mild_idx[m_to_h_prob[mild_idx] > draw_m_h]] = 0
-        state[mild_idx[m_to_d_prob[mild_idx] > draw_m_d]] = 2
-        state[depressed_idx[d_to_h_prob[depressed_idx] > draw_d_h]] = 0
-        state[depressed_idx[d_to_m_prob[depressed_idx] > draw_d_m]] = 1
+        state[mild_idx[mi_to_mo_prob[mild_idx] > draw_mi_mo]] = 1
+        state[mild_idx[mi_to_s_prob[mild_idx] > draw_mi_s]] = 2
+        state[moderate_idx[mo_to_mi_prob[moderate_idx] > draw_mo_mi]] = 0
+        state[moderate_idx[mo_to_s_prob[moderate_idx] > draw_mo_s]] = 2
+        state[severe_idx[s_to_mi_prob[severe_idx] > draw_s_mi]] = 0
+        state[severe_idx[s_to_mo_prob[severe_idx] > draw_s_mo]] = 1
 
         for i, agent in enumerate(agents):
             setattr(agent, self.state_attr, int(state[i]))
 
         self.log_transitions(old_state, state)
 
+
     def _count_states(self, agents):
         counts = [0, 0, 0]
         for agent in agents:
             counts[getattr(agent, self.state_attr)] += 1
         return counts
+
 
     def run(self, group, seed, steps=20):
         self.history = []
@@ -195,10 +173,8 @@ class AlcoholHMDaModel:
         self.initialize_agent_states(group)
         agents = list(self.g.nodes)
 
-        # record t=0
         self.history = [self._count_states(agents)]
 
-        # iterate times specified, recording after each update
         for _ in range(steps):
             self.update_state()
             self.history.append(self._count_states(agents))

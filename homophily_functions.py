@@ -85,8 +85,6 @@ def linear_stochastic_homophily_function(agent1, agent2, weights, max_distances,
     return float(noisy_score)
 
 
-
-
 #Function registry
 HOMOPHILY_FUNCTIONS = {
     "linear_deterministic": linear_deterministic_homophily_function,
