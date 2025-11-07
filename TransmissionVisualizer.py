@@ -427,19 +427,13 @@ class TransmissionVisualizer:
 
 
     def plot_density_heatmap(self, state="initial", normalize=True, figsize=(15, 7),
-                            cmap="coolwarm", output_folder=None, mode="All",
-                            vmax_mean=None, vmax_std=None,
-                            vmin_mean=None, vmin_std=None):
+                            cmap="coolwarm", output_folder=None, mode="All"
+                            , vmax_mean=None, vmax_std=None
+                            , vmin_mean=None, vmin_std=None):
         """
         Plots side-by-side 2D heatmaps:
             • Left  = mean network density
             • Right = standard deviation of density
-        
-        mode:
-            "All"   → density of all ties
-            "Cross" → density of ties between different severity states
-            "Ratio" → Cross / All (relative cross-tie share)
-
         as a function of initial or final group composition.
         """
 
@@ -478,15 +472,7 @@ class TransmissionVisualizer:
                 Mo = comp[1] / total
                 S = comp[2] / total
 
-                if mode == "Ratio":
-                    cross = self._calculate_density(g, mode="Cross")
-                    total = self._calculate_density(g, mode="All")
-                    eps = 1e-6
-                    density = cross / (total + eps)
-
-                else:
-                    density = self._calculate_density(g, mode=mode)
-
+                density = self._calculate_density(g, mode=mode)
                 records.append((Mo, S, density))
 
         if not records:
@@ -565,12 +551,7 @@ class TransmissionVisualizer:
                                 length=style["cbar.ticklength"],
                                 width=style["cbar.tickwidth"])
 
-        if mode == "Ratio":
-            title_prefix = "Cross-Tie Share"
-        else:
-            title_prefix = f"{mode} Ties"
-
-        plt.suptitle(f"{title_prefix}: Mean and Std Network Density by Group Composition",
+        plt.suptitle(f"{mode} Ties: Mean and Std Network Density by Group Composition",
                     fontsize=style["figure.titlesize"], y=1)
         plt.tight_layout()
 
@@ -594,6 +575,7 @@ class TransmissionVisualizer:
             return "Moderate"
         else:
             return "Severe"
+
 
     def combine_density_heatmaps(self, output_folder, spacing=60, bg_color=(255, 255, 255)):
         """
@@ -642,6 +624,126 @@ class TransmissionVisualizer:
 
         return combined_path
 
+
+    def plot_density_thresholds_2x2(self, state="initial", figsize=(14, 12),
+                                    min_all=None, max_all=None,
+                                    min_cross=None, max_cross=None,
+                                    output_folder=None):
+        """
+        Plots 2×2 boolean heatmaps showing where thresholds for mean density are met
+        across four tie-type scenarios:
+
+            1. Maximize all ties & maximize cross ties
+            2. Minimize all ties & maximize cross ties
+            3. Maximize all ties & minimize cross ties
+            4. Minimize all ties & minimize cross ties
+
+        Parameters:
+            state (str): "initial" or "final"
+            min_all, max_all: thresholds for mean density of all ties
+            min_cross, max_cross: thresholds for mean density of cross ties
+        """
+
+        if self.experiment_data is None:
+            raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
+        if state not in {"initial", "final"}:
+            raise ValueError("state must be 'initial' or 'final'")
+
+        records = []
+
+        # ─── Collect group-level densities ─────────────────────────────
+        for exp in self.experiment_data.values():
+            contagion_histories = exp.get("contagion_histories", {})
+            groups = exp.get("groups", [])
+            for g in groups:
+                hist = contagion_histories.get(g.group_id)
+                if hist is None:
+                    continue
+
+                if isinstance(hist, dict):
+                    arrs = [np.array(v) for v in hist.values() if np.array(v).ndim >= 2]
+                    if not arrs:
+                        continue
+                    hist = np.mean(arrs, axis=0)
+                else:
+                    hist = np.array(hist)
+
+                if hist.ndim < 2 or hist.shape[0] < 1:
+                    continue
+
+                comp = hist[0] if state == "initial" else hist[-1]
+                total = np.sum(comp)
+                if total == 0:
+                    continue
+
+                Mo = comp[1] / total
+                S = comp[2] / total
+
+                # Calculate densities
+                density_all = self._calculate_density(g, mode="All")
+                density_cross = self._calculate_density(g, mode="Cross")
+
+                records.append((Mo, S, density_all, density_cross))
+
+        if not records:
+            raise ValueError("No valid groups found for density threshold plotting.")
+
+        df = pd.DataFrame(records, columns=["Mo", "S", "All", "Cross"])
+        df["Mo_rounded"] = df["Mo"].round(3)
+        df["S_rounded"] = df["S"].round(3)
+
+        grouped = df.groupby(["Mo_rounded", "S_rounded"])[["All", "Cross"]].mean().reset_index()
+
+        # ─── Boolean masks for each condition ─────────────────────────
+        conds = {
+            "Max All, Max Cross":  (grouped["All"] >= max_all) & (grouped["Cross"] >= max_cross),
+            "Min All, Max Cross":  (grouped["All"] <= min_all) & (grouped["Cross"] >= max_cross),
+            "Max All, Min Cross":  (grouped["All"] >= max_all) & (grouped["Cross"] <= min_cross),
+            "Min All, Min Cross":  (grouped["All"] <= min_all) & (grouped["Cross"] <= min_cross),
+        }
+
+        # ─── Prepare 2×2 grid ─────────────────────────────────────────
+        fig, axes = plt.subplots(2, 2, figsize=figsize, sharex=True, sharey=True)
+        axes = axes.flatten()
+        cmap = plt.cm.Greens
+
+        for ax, (title, mask) in zip(axes, conds.items()):
+            grid = grouped.copy()
+            grid["ConditionMet"] = mask.astype(int)
+            pivot = pd.pivot_table(grid, values="ConditionMet",
+                                index="Mo_rounded", columns="S_rounded", aggfunc="mean")
+
+            im = ax.imshow(
+                pivot.values,
+                origin="lower",
+                cmap=cmap,
+                vmin=0,
+                vmax=1,
+                aspect="auto",
+                extent=[
+                    pivot.columns.min(),
+                    pivot.columns.max(),
+                    pivot.index.min(),
+                    pivot.index.max(),
+                ],
+            )
+
+            ax.set_title(title, fontsize=16, pad=10)
+            ax.set_xlabel("Initial fraction Severely Depressed")
+            ax.set_ylabel("Initial fraction Moderately Depressed")
+            ax.tick_params(labelsize=12)
+
+        # plt.suptitle("Boolean Maps of Density Threshold Scenarios", fontsize=18, y=0.95)
+        plt.tight_layout()
+
+        if output_folder:
+            output_folder = Path(output_folder)
+            output_folder.mkdir(parents=True, exist_ok=True)
+            save_path = output_folder / f"density_thresholds_2x2_{state}.png"
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            print(f"Figure saved to: {save_path}")
+
+        plt.show()
 
 
     def plot_stacked_phq9_distributions(

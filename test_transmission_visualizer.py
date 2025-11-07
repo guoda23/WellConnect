@@ -39,15 +39,13 @@ viz.load_experiment_data(noise_level=0.15)
 #     vmin_std=0.0
 # )
 
-viz.plot_density_heatmap(
+viz.plot_density_thresholds_2x2(
     state="initial",
-    output_folder="Results/transmission", #TODO: add /even for even weights
-    mode="Ratio",
-    # vmax_mean=0.425,
-    # vmax_std=0.425,
-    # vmin_mean=0.0,
-    # vmin_std=0.0
+    min_all=0.5, max_all=0.7,
+    min_cross=0.15, max_cross=0.3,
+    output_folder="Results/transmission"
 )
+
 
 # viz.combine_density_heatmaps("Results/transmission/")
 
