@@ -51,42 +51,42 @@ viz.load_experiment_data(noise_level=0.15)
 #     output_folder="Results/transmission"
 # )
 
-# grouped, conds = viz.plot_density_percentiles_2x2(state="initial")
+grouped, conds = viz.plot_density_percentiles_2x2(state="initial")
 
-# # build boolean pivot mask
-# mask_series = conds["Min All Ties, Max Cross Ties"]
-# mask_pivot = pd.pivot_table(
-#     grouped.assign(ConditionMet=mask_series),
-#     values="ConditionMet",
-#     index="Mo_rounded",
-#     columns="S_rounded",
-#     aggfunc=lambda x: any(x),   # boolean aggregation
-# )
-
-# # make sure dtype is boolean
-# mask_pivot = mask_pivot.astype(bool)
-
-
-# viz.plot_relative_change_panels(
-#     mode="Mean",
-#     mask=mask_pivot,
-#     mask_label="MinAll_MaxCross",
-#     output_folder="Results/transmission"
-# )
-
-
-viz.combine_condition_plots_vertical(
-    output_folder="Results/transmission",
-    state="initial",
-    mode="All",
-    base_name="relative_change_Mean",
-    mask_labels=[
-        "MaxAll_MaxCross",
-        "MinAll_MaxCross",
-        "MaxAll_MinCross",
-        "MinAll_MinCross",
-    ],
+# build boolean pivot mask
+mask_series = conds["Max All Ties, Max Cross Ties"]
+mask_pivot = pd.pivot_table(
+    grouped.assign(ConditionMet=mask_series),
+    values="ConditionMet",
+    index="Mo_rounded",
+    columns="S_rounded",
+    aggfunc=lambda x: any(x),   # boolean aggregation
 )
+
+# make sure dtype is boolean
+mask_pivot = mask_pivot.astype(bool)
+
+
+viz.plot_relative_change_panels(
+    mode="Mean",
+    mask=mask_pivot,
+    mask_label="MaxAll_MaxCross",
+    output_folder="Results/transmission"
+)
+
+
+# viz.combine_condition_plots_vertical(
+#     output_folder="Results/transmission",
+#     state="initial",
+#     mode="All",
+#     base_name="relative_change_Mean",
+#     mask_labels=[
+#         "MaxAll_MaxCross",
+#         "MinAll_MaxCross",
+#         "MaxAll_MinCross",
+#         "MinAll_MinCross",
+#     ],
+# )
 
 
 # viz.plot_stacked_phq9_distributions(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'],
