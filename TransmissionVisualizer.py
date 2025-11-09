@@ -97,7 +97,8 @@ class TransmissionVisualizer:
     # ───────────────────────────────────────────
 
     def plot_relative_change_panels(self, mode="Mean", normalize=True, figsize=(15, 6),
-                                    cmap="coolwarm", output_folder=None):
+                                    cmap="coolwarm", output_folder=None,
+                                    mask=None, mask_label=None):
         """
         Plots three 2D heatmaps (Mild, Moderate, Severe) showing the relative change
         between initial and final proportions of each state across all groups.
@@ -172,11 +173,29 @@ class TransmissionVisualizer:
         aggfunc_map = {"Mean": "mean", "Std": "std"}
         aggfunc = aggfunc_map.get(mode, "mean")
 
+        # round to 3 decimals so indices align with density masks
+        df["Mo_r"] = df["Mo0"].round(3)
+        df["S_r"]  = df["S0"].round(3)
+
+
         pivots = {
-            "Mild":      pd.pivot_table(df, values="dMi", index="Mo0", columns="S0", aggfunc=aggfunc),
-            "Moderate":  pd.pivot_table(df, values="dMo", index="Mo0", columns="S0", aggfunc=aggfunc),
-            "Severe":    pd.pivot_table(df, values="dS",  index="Mo0", columns="S0", aggfunc=aggfunc),
+            "Mild":      pd.pivot_table(df, values="dMi", index="Mo_r", columns="S_r", aggfunc=aggfunc),
+            "Moderate":  pd.pivot_table(df, values="dMo", index="Mo_r", columns="S_r", aggfunc=aggfunc),
+            "Severe":    pd.pivot_table(df, values="dS",  index="Mo_r", columns="S_r", aggfunc=aggfunc),
         }
+
+        # ─── Optional mask application ──────────────────────────────
+        if mask is not None:
+            for k in pivots.keys():
+                pivot = pivots[k]
+                if isinstance(mask, pd.DataFrame):
+                    mask_aligned = mask.reindex_like(pivot)
+                elif isinstance(mask, np.ndarray):
+                    mask_aligned = pd.DataFrame(mask, index=pivot.index, columns=pivot.columns)
+                else:
+                    raise ValueError("mask must be a DataFrame or numpy array")
+                pivots[k] = pivot.where(mask_aligned)
+
 
         # ─── Plot the three heatmaps ───────────────────────────────────────
         fig, axes = plt.subplots(1, 3, figsize=figsize, sharex=True, sharey=True)
@@ -192,7 +211,7 @@ class TransmissionVisualizer:
             "figure.titlesize": 20,
         }
 
-        vmax, vmin = 0.025, 0
+        vmax, vmin = 0.008, -0.008  
         for ax, (title, pivot) in zip(axes, pivots.items()):
             im = ax.imshow(
                 pivot.values,
@@ -221,17 +240,32 @@ class TransmissionVisualizer:
                                 length=style["cbar.ticklength"],
                                 width=style["cbar.tickwidth"])
 
-        plt.suptitle(f"{mode} Relative Change by Initial Group Composition",
-                    fontsize=style["figure.titlesize"], y=1)
+        label_titles = {
+            "MaxAll_MaxCross": "Maximize All Ties, Maximize Cross Ties",
+            "MinAll_MaxCross": "Minimize All Ties, Maximize Cross Ties",
+            "MaxAll_MinCross": "Maximize All Ties, Minimize Cross Ties",
+            "MinAll_MinCross": "Minimize All Ties, Minimize Cross Ties",
+        }
+        if mask_label:
+            title_text = f"{label_titles.get(mask_label, mask_label)}: Relative Change in Transmission"
+            plt.suptitle(title_text, fontsize=style["figure.titlesize"], y=1)
+        else:
+            plt.suptitle(
+                f"{mode} Relative Change by Initial Group Composition",
+                fontsize=style["figure.titlesize"], y=1
+            )
+
         plt.tight_layout()
 
         # ─── Optional export ────────────────────────────────────────────────
         if output_folder:
             output_folder = Path(output_folder)
             output_folder.mkdir(parents=True, exist_ok=True)
-            save_path = output_folder / f"relative_change_{mode}.png"
+            label_suffix = f"_{mask_label.replace(' ', '_')}" if mask_label else ""
+            save_path = output_folder / f"relative_change_{mode}{label_suffix}.png"
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"Figure saved to: {save_path}")
+
 
         plt.show()
 
@@ -279,6 +313,7 @@ class TransmissionVisualizer:
                 end = hist[-1]
                 print(f"Group {gid}: start = {np.round(start, 3)}, end = {np.round(end, 3)}")
 
+
     def plot_group_count_distribution(
         self,
         normalize=True,
@@ -287,10 +322,10 @@ class TransmissionVisualizer:
         output_folder=None,
     ):
         """
-        Plots a single 2D heatmap showing how many groups occupy each
+        Plots a 2D heatmap showing how many groups occupy each
         region of the initial composition space (Mo0 vs S0).
-
-        This replaces the 'Counts' mode from plot_relative_change_panels().
+        Additionally prints the top 3 composition points
+        with the highest number of groups.
         """
 
         if self.experiment_data is None:
@@ -342,6 +377,19 @@ class TransmissionVisualizer:
         pivot_counts = pd.pivot_table(
             df, values="Mo0", index="Mo_rounded", columns="S_rounded", aggfunc="count"
         )
+
+        # ─── Identify top 3 points ─────────────────────────────────
+        counts_long = pivot_counts.stack().reset_index()
+        counts_long.columns = ["Mo_rounded", "S_rounded", "count"]
+        top10 = counts_long.sort_values("count", ascending=False).head(10)
+
+        print("\nTop 10 compositions with highest number of groups:")
+        for i, row in top10.iterrows():
+            print(
+                f"{i+1}. Mo0={row['Mo_rounded']:.3f}, "
+                f"S0={row['S_rounded']:.3f}, "
+                f"Groups={int(row['count'])}"
+            )
 
         # ─── Plot ──────────────────────────────────────────────────
         fig, ax = plt.subplots(figsize=figsize)
@@ -426,7 +474,7 @@ class TransmissionVisualizer:
         return combined_path
 
 
-    def plot_density_heatmap(self, state="initial", normalize=True, figsize=(15, 7),
+    def plot_density_heatmap(self, state="initial", normalize=True, figsize=(10, 6),
                             cmap="coolwarm", output_folder=None, mode="All"
                             , vmax_mean=None, vmax_std=None
                             , vmin_mean=None, vmin_std=None):
@@ -498,14 +546,14 @@ class TransmissionVisualizer:
         pivots = [pivot_mean, pivot_std]
 
         style = {
-            "axes.titlesize": 20,
-            "axes.labelsize": 18,
-            "xtick.labelsize": 14,
-            "ytick.labelsize": 14,
-            "cbar.labelsize": 14,
-            "cbar.ticklength": 8,
+            "axes.titlesize": 16,
+            "axes.labelsize": 15,
+            "xtick.labelsize": 11,
+            "ytick.labelsize": 11,
+            "cbar.labelsize": 11,
+            "cbar.ticklength": 6,
             "cbar.tickwidth": 1.2,
-            "figure.titlesize": 22,
+            "figure.titlesize": 18,
         }
 
         for ax, pivot, title in zip(axes, pivots, titles):
@@ -625,7 +673,7 @@ class TransmissionVisualizer:
         return combined_path
 
 
-    def plot_density_thresholds_2x2(self, state="initial", figsize=(14, 12),
+    def plot_density_percentiles_2x2(self, state="initial",
                                     min_all=None, max_all=None,
                                     min_cross=None, max_cross=None,
                                     output_folder=None):
@@ -637,12 +685,22 @@ class TransmissionVisualizer:
             2. Minimize all ties & maximize cross ties
             3. Maximize all ties & minimize cross ties
             4. Minimize all ties & minimize cross ties
-
-        Parameters:
-            state (str): "initial" or "final"
-            min_all, max_all: thresholds for mean density of all ties
-            min_cross, max_cross: thresholds for mean density of cross ties
         """
+
+        # ────────────────────────────────────────────────
+        # Style settings (centralized)
+        # ────────────────────────────────────────────────
+        style = {
+            "figsize": (10, 12),
+            "title_fontsize": 18,
+            "label_fontsize": 16,
+            "tick_fontsize": 12,
+            "title_pad": 10,
+            "cmap": plt.cm.Greens,
+            "dpi": 300,
+            "suptitle_fontsize": 22,
+            "suptitle_y": 0.95,
+        }
 
         if self.experiment_data is None:
             raise RuntimeError("No experiment data loaded. Run load_experiment_data() first.")
@@ -693,19 +751,37 @@ class TransmissionVisualizer:
         df["S_rounded"] = df["S"].round(3)
 
         grouped = df.groupby(["Mo_rounded", "S_rounded"])[["All", "Cross"]].mean().reset_index()
+        
+        # ─── Default to percentile mode ─────────────────────────
+        if min_all is None or max_all is None or min_cross is None or max_cross is None:
+            p_low, p_high = 20, 80
+            all_vals = grouped["All"].dropna()
+            cross_vals = grouped["Cross"].dropna()
+
+            if min_all is None:
+                min_all = np.percentile(all_vals, p_low)
+            if max_all is None:
+                max_all = np.percentile(all_vals, p_high)
+            if min_cross is None:
+                min_cross = np.percentile(cross_vals, p_low)
+            if max_cross is None:
+                max_cross = np.percentile(cross_vals, p_high)
+
+            print(f"Auto thresholds set:")
+            print(f"  All ties: min={min_all:.3f}, max={max_all:.3f}")
+            print(f"  Cross ties: min={min_cross:.3f}, max={max_cross:.3f}")
 
         # ─── Boolean masks for each condition ─────────────────────────
         conds = {
-            "Max All, Max Cross":  (grouped["All"] >= max_all) & (grouped["Cross"] >= max_cross),
-            "Min All, Max Cross":  (grouped["All"] <= min_all) & (grouped["Cross"] >= max_cross),
-            "Max All, Min Cross":  (grouped["All"] >= max_all) & (grouped["Cross"] <= min_cross),
-            "Min All, Min Cross":  (grouped["All"] <= min_all) & (grouped["Cross"] <= min_cross),
+            "Max All Ties, Max Cross Ties":  (grouped["All"] >= max_all) & (grouped["Cross"] >= max_cross),
+            "Min All Ties, Max Cross Ties":  (grouped["All"] <= min_all) & (grouped["Cross"] >= max_cross),
+            "Max All Ties, Min Cross Ties":  (grouped["All"] >= max_all) & (grouped["Cross"] <= min_cross),
+            "Min All Ties, Min Cross Ties":  (grouped["All"] <= min_all) & (grouped["Cross"] <= min_cross),
         }
 
         # ─── Prepare 2×2 grid ─────────────────────────────────────────
-        fig, axes = plt.subplots(2, 2, figsize=figsize, sharex=True, sharey=True)
+        fig, axes = plt.subplots(2, 2, figsize=style["figsize"], sharex=True, sharey=True)
         axes = axes.flatten()
-        cmap = plt.cm.Greens
 
         for ax, (title, mask) in zip(axes, conds.items()):
             grid = grouped.copy()
@@ -716,7 +792,7 @@ class TransmissionVisualizer:
             im = ax.imshow(
                 pivot.values,
                 origin="lower",
-                cmap=cmap,
+                cmap=style["cmap"],
                 vmin=0,
                 vmax=1,
                 aspect="auto",
@@ -728,22 +804,27 @@ class TransmissionVisualizer:
                 ],
             )
 
-            ax.set_title(title, fontsize=16, pad=10)
-            ax.set_xlabel("Initial fraction Severely Depressed")
-            ax.set_ylabel("Initial fraction Moderately Depressed")
-            ax.tick_params(labelsize=12)
+            ax.set_title(title, fontsize=style["title_fontsize"], pad=style["title_pad"])
+            ax.set_xlabel("Initial fraction Severely Depressed", fontsize=style["label_fontsize"])
+            ax.set_ylabel("Initial fraction Moderately Depressed", fontsize=style["label_fontsize"])
+            ax.tick_params(labelsize=style["tick_fontsize"])
+        
+        for ax in axes:
+            ax.tick_params(axis="x", labelbottom=True, bottom=True)
 
-        # plt.suptitle("Boolean Maps of Density Threshold Scenarios", fontsize=18, y=0.95)
         plt.tight_layout()
-
+        plt.subplots_adjust(hspace=0.3, wspace=0.15)
+        
         if output_folder:
             output_folder = Path(output_folder)
             output_folder.mkdir(parents=True, exist_ok=True)
             save_path = output_folder / f"density_thresholds_2x2_{state}.png"
-            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            plt.savefig(save_path, dpi=style["dpi"], bbox_inches="tight")
             print(f"Figure saved to: {save_path}")
 
         plt.show()
+
+        return grouped, conds
 
 
     def plot_stacked_phq9_distributions(
@@ -880,3 +961,74 @@ class TransmissionVisualizer:
             print(f"Figure saved to: {save_path}")
 
         plt.show()
+
+
+    def combine_condition_plots_vertical(
+        self,
+        output_folder,
+        state="initial",
+        mode="All",
+        base_name="relative_change_Mean",     # or "relative_change_Mean"
+        mask_labels=None,                # list of 4 mask labels (strings)
+        spacing=60,
+        bg_color=(255, 255, 255)
+    ):
+        """
+        Combines four condition plots (e.g., MaxAll_MaxCross, MinAll_MaxCross, etc.)
+        into one vertically stacked image.
+
+        Parameters
+        ----------
+        output_folder : str or Path
+            Folder containing the saved plots.
+        state : str, optional
+            "initial" or "final", used in filenames.
+        mode : str, optional
+            "All" or "Cross", used in filenames.
+        base_name : str, optional
+            Prefix of the plot file (e.g., "density_heatmap" or "relative_change_Mean").
+        mask_labels : list of str
+            List of the four mask label suffixes, e.g.
+            ["MaxAll_MaxCross", "MinAll_MaxCross", "MaxAll_MinCross", "MinAll_MinCross"].
+        spacing : int, optional
+            Vertical space (in pixels) between stacked images.
+        bg_color : tuple, optional
+            RGB background color, default white.
+        """
+        from PIL import Image
+        from pathlib import Path
+
+        output_folder = Path(output_folder)
+        if mask_labels is None or len(mask_labels) == 0:
+            raise ValueError("mask_labels must be a non-empty list of plot suffixes")
+
+        # ─── Collect and open images ─────────────────────────────
+        images = []
+        for label in mask_labels:
+            filename = f"{base_name}_{label}.png"
+            path = output_folder / filename
+            if not path.exists():
+                raise FileNotFoundError(f"Missing expected plot: {path}")
+            images.append(Image.open(path))
+
+        # ─── Determine total canvas size ─────────────────────────
+        width = max(img.width for img in images)
+        total_height = sum(img.height for img in images) + spacing * (len(images) - 1)
+
+        combined = Image.new("RGB", (width, total_height), bg_color)
+
+        # ─── Paste images vertically ─────────────────────────────
+        y_offset = 0
+        for img in images:
+            combined.paste(img, (0, y_offset))
+            y_offset += img.height + spacing
+
+        # ─── Save combined image ────────────────────────────────
+        combined_path = output_folder / f"{base_name}_interventions_combined.png"
+        combined.save(combined_path)
+        print(f"Combined image saved to: {combined_path}")
+
+        return combined_path
+    
+
+
