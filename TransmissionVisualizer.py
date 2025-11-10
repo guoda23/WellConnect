@@ -98,7 +98,8 @@ class TransmissionVisualizer:
 
     def plot_relative_change_panels(self, mode="Mean", normalize=True, figsize=(15, 6),
                                     cmap="coolwarm", output_folder=None,
-                                    mask=None, mask_label=None):
+                                    mask=None, mask_label=None,
+                                    vmax=0.008, vmin=-0.008):
         """
         Plots three 2D heatmaps (Mild, Moderate, Severe) showing the relative change
         between initial and final proportions of each state across all groups.
@@ -211,7 +212,6 @@ class TransmissionVisualizer:
             "figure.titlesize": 20,
         }
 
-        vmax, vmin = 0.008, -0.008  
         for ax, (title, pivot) in zip(axes, pivots.items()):
             im = ax.imshow(
                 pivot.values,

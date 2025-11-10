@@ -2,94 +2,89 @@ from networkx import density
 from TransmissionVisualizer import TransmissionVisualizer
 import pandas as pd
 
-viz = TransmissionVisualizer(
-    batch_folder = "Experiments/transmission/batch_2025-10-31_17-50-13" # 0.7 age, 0.2 edu, 0.1 gender
-    # batch_folder = "Experiments/transmission/batch_2025-10-31_19-10-40" # 1/3 age, 1/3 edu, 1/3 gender
+HOMOPHILY_FUNCTION = "amplified_effect" # 0.7 age, 0.2 edu, 0.1 gender      OR "even": 1/3 age, 1/3 edu, 1/3 gender
 
-)
+if HOMOPHILY_FUNCTION == "amplified_effect":
+    BATCH_FOLDER = "Experiments/transmission/batch_2025-10-31_17-50-13"
+    OUTPUT_FOLDER = "Results/transmission/"
+elif HOMOPHILY_FUNCTION == "even":
+    BATCH_FOLDER = "Experiments/transmission/batch_2025-10-31_19-10-40"
+    OUTPUT_FOLDER = "Results/transmission/even/"
+
+
+
+# Load experiments
+viz = TransmissionVisualizer(batch_folder = BATCH_FOLDER)
 viz.load_experiment_data(noise_level=0.15)
 
+#General distribution of demographic traits x depression severity
+viz.plot_stacked_phq9_distributions(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'],
+                                    output_folder=OUTPUT_FOLDER)
 
-#N.B. adjust vmax beforehand if needed
-# viz.plot_relative_change_panels(mode="Mean", output_folder="Results/transmission/even")
-# viz.plot_relative_change_panels(mode="Std", output_folder="Results/transmission/even")
-# viz.plot_relative_change_panels(mode="Counts", output_folder="Results/transmission/even")
+# Count plot
+viz.plot_group_count_distribution(output_folder=OUTPUT_FOLDER)
 
+# General transmission dynamics plots
+viz.plot_relative_change_panels(mode="Mean", vmax=0.008, vmin=-0.008, output_folder=OUTPUT_FOLDER)
+viz.plot_relative_change_panels(mode="Std", vmax=0.025, vmin=0, output_folder=OUTPUT_FOLDER)
 
-# viz.combine_relative_change_plots("Results/transmission/")
+viz.combine_relative_change_plots(OUTPUT_FOLDER)
 
-# viz.plot_group_count_distribution(output_folder="Results/transmission/")
+# Density heatmaps 2x2 mean and std for all and cross ties
 
-# density heatmap
-# viz.plot_density_heatmap(
-#     state="initial",
-#     output_folder="Results/transmission", #TODO: add /even for even weights
-#     mode="All",
-#     # vmax_mean=0.85,
-#     # vmax_std=0.85,
-#     # vmin_mean=0.0,
-#     # vmin_std=0.0
-# )
-
-# viz.plot_density_heatmap(
-#     state="initial",
-#     output_folder="Results/transmission", #TODO: add /even for even weights
-#     mode="Cross",
-#     # vmax_mean=0.425,
-#     # vmax_std=0.425,
-#     # vmin_mean=0.0,
-#     # vmin_std=0.0
-# )
-
-
-
-# viz.combine_density_heatmaps("Results/transmission/")
-
-
-# viz.plot_density_percentiles_2x2(
-#     state="initial",
-#     output_folder="Results/transmission"
-# )
-
-grouped, conds = viz.plot_density_percentiles_2x2(state="initial")
-
-# build boolean pivot mask
-mask_series = conds["Max All Ties, Max Cross Ties"]
-mask_pivot = pd.pivot_table(
-    grouped.assign(ConditionMet=mask_series),
-    values="ConditionMet",
-    index="Mo_rounded",
-    columns="S_rounded",
-    aggfunc=lambda x: any(x),   # boolean aggregation
+viz.plot_density_heatmap(
+    state="initial",
+    output_folder=OUTPUT_FOLDER, #TODO: add /even for even weights
+    mode="All"
 )
 
-# make sure dtype is boolean
-mask_pivot = mask_pivot.astype(bool)
-
-
-viz.plot_relative_change_panels(
-    mode="Mean",
-    mask=mask_pivot,
-    mask_label="MaxAll_MaxCross",
-    output_folder="Results/transmission"
+viz.plot_density_heatmap(
+    state="initial",
+    output_folder=OUTPUT_FOLDER, #TODO: add /even for even weights
+    mode="Cross"
 )
 
+viz.combine_density_heatmaps(OUTPUT_FOLDER)
 
-# viz.combine_condition_plots_vertical(
-#     output_folder="Results/transmission",
-#     state="initial",
-#     mode="All",
-#     base_name="relative_change_Mean",
-#     mask_labels=[
-#         "MaxAll_MaxCross",
-#         "MinAll_MaxCross",
-#         "MaxAll_MinCross",
-#         "MinAll_MinCross",
-#     ],
-# )
+# Boolean plot for top percentiles of density
+grouped, conds = viz.plot_density_percentiles_2x2(state="initial", output_folder=OUTPUT_FOLDER)
 
+# Plots: Boolean mask on contagion dynamics for the four stratgies (max all ties, max cross ties; min all ties, max cross ties; etc)
+for label, condition_mask in conds.items():
+    # build boolean pivot mask
+    mask_pivot = pd.pivot_table(
+        grouped.assign(ConditionMet=condition_mask),
+        values="ConditionMet",
+        index="Mo_rounded",
+        columns="S_rounded",
+        aggfunc=lambda x: any(x),
+    ).astype(bool)
 
-# viz.plot_stacked_phq9_distributions(traits=['Gender_tertiary', 'Age_tertiary', 'EducationLevel_tertiary'],
-#                                     output_folder="Results/transmission")
+    # shorten label for clarity
+    safe_label = (
+        label.replace(" Ties", "")
+             .replace(", ", "_")
+             .replace(" ", "")
+    )
+    # e.g. "Max All Ties, Max Cross Ties" -> "MaxAll_MaxCross"
 
+    # plot
+    viz.plot_relative_change_panels(
+        mode="Mean",
+        mask=mask_pivot,
+        mask_label=safe_label,
+        output_folder=OUTPUT_FOLDER,
+    )
 
+viz.combine_condition_plots_vertical(
+    output_folder=OUTPUT_FOLDER,
+    state="initial",
+    mode="All",
+    base_name="relative_change_Mean",
+    mask_labels=[
+        "MaxAll_MaxCross",
+        "MinAll_MaxCross",
+        "MaxAll_MinCross",
+        "MinAll_MinCross",
+    ],
+)
