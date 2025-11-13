@@ -1,0 +1,19 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: WellConnect
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Guoda
+    family-names: Paulauskaitė
+    email: paulauskaite.guoda@gmail.com
+    affiliation: Amsterdam UMC
+repository-code: 'https://github.com/guoda23/WellConnect'
+abstract: >-
+  Designing Social Connection: Computer Modeling to
+  Establish Quality Social Connections in Urban Mental
+  Health Interventions
