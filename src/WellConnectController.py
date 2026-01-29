@@ -89,8 +89,6 @@ class WellConnectController:
             contagion_history_dict : {seed: {group_id: np.ndarray}}
             transition_log_dict    : {seed: {group_id: list[dict]}}
         """
-        from TransmissionSimulator import TransmissionSimulator
-
         contagion_sim = TransmissionSimulator(model_type=model_type)
         contagion_history_dict = {}
         transition_log_dict = {}
