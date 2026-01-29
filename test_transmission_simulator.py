@@ -5,7 +5,7 @@ import os
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-from TransmissionSimulator import TransmissionSimulator
+from src.modules.TransmissionSimulator import TransmissionSimulator
 
 
 def load_groups_from_pickle(pkl_path):

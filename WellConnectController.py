@@ -2,15 +2,15 @@ import os
 import pickle
 from datetime import datetime
 
-from DataHandler import DataHandler
+from src.modules.DataHandler import DataHandler
 from GroupCreator import GroupCreator
-from group_creation_strategies import RandomSamplingStrategy, TraitBasedStrategy, EntropyControlledSamplingStrategy, MultiTraitEntropySamplingStrategy
-from ConnectionPredictor import ConnectionPredictor
-from RegressionRunner import RegressionRunner
-from StatisticalPowerCalculator import StatisticalPowerCalculator
-from OutputGenerator import OutputGenerator
-from Visualizer3DScatterplot import Visualizer3DScatterPlot
-from TransmissionSimulator import TransmissionSimulator
+from src.models.group_creation_strategies import MultiTraitEntropySamplingStrategy
+from src.modules.ConnectionPredictor import ConnectionPredictor
+from src.modules.RegressionRunner import RegressionRunner
+from src.modules.StatisticalPowerCalculator import StatisticalPowerCalculator
+from src.modules.OutputGenerator import OutputGenerator
+from src.modules.Visualizer3DScatterplot import Visualizer3DScatterPlot
+from src.modules.TransmissionSimulator import TransmissionSimulator
 
 class WellConnectController:
     def __init__(self, data_path, group_size, attributes, max_distances, file_type = 'csv'):
@@ -29,31 +29,14 @@ class WellConnectController:
         self.statistical_power_calculator = None
 
 
-    def display_population_data(self): #TODO: remove later; testing method
-        print("Population Data:")
-        print(self.population_data.head()) 
-
-
     def set_group_creation_strategy(self, strategy, **kwargs):
         """Set the group creation strategy with shared and specific arguments."""
-        if strategy == "random":
-            self.group_creator = GroupCreator(
-                RandomSamplingStrategy(self.agents, self.group_size, **kwargs)
-            )
-        elif strategy == "trait-based":
-            self.group_creator = GroupCreator(
-                TraitBasedStrategy(self.agents, self.group_size, **kwargs)
-            )
-        elif strategy == "entropy-controlled":
-            self.group_creator = GroupCreator(
-                EntropyControlledSamplingStrategy(self.agents, self.group_size, **kwargs)
-            )
-        elif strategy == "multi-trait-entropy":
+        if strategy == "multi-trait-entropy":
             self.group_creator = GroupCreator(
                 MultiTraitEntropySamplingStrategy(self.agents, self.group_size, **kwargs)
             )
         else:
-            raise ValueError("Unknown strategy: Choose 'random', 'trait_based', or 'entropy_controlled'")
+            raise ValueError("Unknown strategy: Choose 'multi-trait-entropy'")
     
 
     def create_groups(self, strategy, **kwargs):

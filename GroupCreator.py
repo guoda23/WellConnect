@@ -1,4 +1,4 @@
-from group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
+from src.models.group_creation_strategies.GroupCreationStrategy import GroupCreationStrategy
 
 
 class GroupCreator:

@@ -1,7 +1,7 @@
 
 # %%
 
-from OutputGenerator import OutputGenerator
+from src.modules.OutputGenerator import OutputGenerator
 #constrained reg:
 batch_folder_stochastic = "Experiments/homophily_function_retrievability/stochastic/batch_2025-10-04_00-43-50"
 #constrained reg trait entropy 1.761 val:

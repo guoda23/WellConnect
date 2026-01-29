@@ -1,7 +1,7 @@
 
 # %%w
 
-from OutputGenerator import OutputGenerator
+from src.modules.OutputGenerator import OutputGenerator
 #constrained reg:
 batch_folder_deterministic = "Experiments/homophily_function_retrievability/deterministic/batch_2025-10-03_15-27-55"
 # unconstrained reg:
