@@ -826,7 +826,6 @@ class TransmissionVisualizer:
 
         return grouped, conds
 
-
     def plot_stacked_phq9_distributions(
         self,
         traits,
