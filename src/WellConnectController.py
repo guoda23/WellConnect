@@ -3,6 +3,7 @@ import pickle
 from datetime import datetime
 
 from src.modules.DataHandler import DataHandler
+from src.modules.GroupCreator import GroupCreator
 from src.modules.ConnectionPredictor import ConnectionPredictor
 from src.modules.RegressionRunner import RegressionRunner
 from src.modules.StatisticalPowerCalculator import StatisticalPowerCalculator
