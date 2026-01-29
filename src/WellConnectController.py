@@ -3,14 +3,13 @@ import pickle
 from datetime import datetime
 
 from src.modules.DataHandler import DataHandler
-from GroupCreator import GroupCreator
-from src.models.group_creation_strategies import MultiTraitEntropySamplingStrategy
 from src.modules.ConnectionPredictor import ConnectionPredictor
 from src.modules.RegressionRunner import RegressionRunner
 from src.modules.StatisticalPowerCalculator import StatisticalPowerCalculator
 from src.modules.OutputGenerator import OutputGenerator
 from src.modules.Visualizer3DScatterplot import Visualizer3DScatterPlot
 from src.modules.TransmissionSimulator import TransmissionSimulator
+from src.models.group_creation_strategies import MultiTraitEntropySamplingStrategy
 
 class WellConnectController:
     def __init__(self, data_path, group_size, attributes, max_distances, file_type = 'csv'):

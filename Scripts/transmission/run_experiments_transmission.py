@@ -19,7 +19,7 @@ DATA_PATH = ROOT_DIR / "data" / "preprocessed.csv" # where input data is located
 # add project root to sys.path so we can import WellConnectController
 sys.path.append(str(ROOT_DIR))
 
-from WellConnectController import WellConnectController
+from src.WellConnectController import WellConnectController
 
 # ───────────────────────────────
 # Helper Functions
