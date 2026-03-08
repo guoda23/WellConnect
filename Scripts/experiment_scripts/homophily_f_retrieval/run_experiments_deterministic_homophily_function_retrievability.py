@@ -5,14 +5,22 @@ import sys
 import json, shutil
 from pathlib import Path
 from datetime import datetime
-import numpy as np
 from fractions import Fraction
 
-SCRIPT_DIR = Path(__file__).resolve().parent       # where this script is located (Scripts/)
-ROOT_DIR = SCRIPT_DIR.parent.parent                       # project root (where WellConnectController.py lives)
-CONFIG_PATH = ROOT_DIR / "Config_files" / "homophily_f_retrieval"/ "config_deterministic_homophily_f_retrievability.json"
+
+def resolve_project_root(start_dir: Path) -> Path:
+    # Walk up from this script until we find the repository root markers.
+    for candidate in [start_dir, *start_dir.parents]:
+        if (candidate / "src" / "WellConnectController.py").exists() and (candidate / "Config_files").exists():
+            return candidate
+    raise RuntimeError("Could not locate project root from script location")
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = resolve_project_root(SCRIPT_DIR)
+CONFIG_PATH = ROOT_DIR / "Config_files" / "homophily_f_retrieval" / "config_deterministic_homophily_f_retrievability.json"
 EXPERIMENTS_DIR = ROOT_DIR / "Experiments"
-DATA_PATH = ROOT_DIR / "data" / "preprocessed.csv" # where input data is located
+DATA_PATH = ROOT_DIR / "data" / "preprocessed.csv"
 
 # add project root to sys.path so we can import WellConnectController
 sys.path.append(str(ROOT_DIR))
@@ -111,7 +119,7 @@ for seed in SEEDS:
     experiment_count = 1
 
     for target_entropy in TARGET_ENTROPY_LIST:
-        controller = WellConnectController(data_path='data/preprocessed.csv',
+        controller = WellConnectController(data_path=DATA_PATH,
                                             group_size=GROUP_SIZE,
                                             attributes=ATTRIBUTES,
                                             max_distances=MAX_DISTANCES)

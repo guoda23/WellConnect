@@ -1,15 +1,31 @@
+import sys
+from pathlib import Path
 from networkx import density
-from TransmissionVisualizer import TransmissionVisualizer
 import pandas as pd
+
+
+def resolve_project_root(start_dir: Path) -> Path:
+    """Walk up from this script until we find the repository root."""
+    for candidate in [start_dir, *start_dir.parents]:
+        if (candidate / "src" / "WellConnectController.py").exists() and (candidate / "Experiments").exists():
+            return candidate
+    raise RuntimeError("Could not locate project root from script location")
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = resolve_project_root(SCRIPT_DIR)
+sys.path.insert(0, str(ROOT_DIR))
+
+from src.modules.TransmissionVisualizer import TransmissionVisualizer
 
 HOMOPHILY_FUNCTION = "amplified_effect" # 0.7 age, 0.2 edu, 0.1 gender      OR "even": 1/3 age, 1/3 edu, 1/3 gender
 
 if HOMOPHILY_FUNCTION == "amplified_effect":
-    BATCH_FOLDER = "Experiments/transmission/batch_2025-10-31_17-50-13"
-    OUTPUT_FOLDER = "Results/transmission/"
+    BATCH_FOLDER = str(ROOT_DIR / "Experiments" / "transmission" / "batch_2025-10-31_17-50-13")
+    OUTPUT_FOLDER = str(ROOT_DIR / "Results" / "transmission")
 elif HOMOPHILY_FUNCTION == "even":
-    BATCH_FOLDER = "Experiments/transmission/batch_2025-10-31_19-10-40"
-    OUTPUT_FOLDER = "Results/transmission/even/"
+    BATCH_FOLDER = str(ROOT_DIR / "Experiments" / "transmission" / "batch_2025-10-31_19-10-40")
+    OUTPUT_FOLDER = str(ROOT_DIR / "Results" / "transmission" / "even")
 
 
 

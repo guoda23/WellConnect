@@ -5,19 +5,38 @@ import sys
 import json, shutil
 from pathlib import Path
 from datetime import datetime
-import numpy as np
 from fractions import Fraction
+from scipy.stats import entropy
 
-SCRIPT_DIR = Path(__file__).resolve().parent       # where this script is located (Scripts/)
-ROOT_DIR = SCRIPT_DIR.parent.parent                       # project root (where WellConnectController.py lives)
-CONFIG_PATH = ROOT_DIR / "Config_files" / "homophily_f_retrieval" / "config_stochastic_homophily_f_retrievability.json"
+
+def resolve_project_root(start_dir: Path) -> Path:
+    # Walk up from this script until we find the repository root markers.
+    for candidate in [start_dir, *start_dir.parents]:
+        if (candidate / "src" / "WellConnectController.py").exists() and (candidate / "Config_files").exists():
+            return candidate
+    raise RuntimeError("Could not locate project root from script location")
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = resolve_project_root(SCRIPT_DIR)
+CONFIG_PATH = ROOT_DIR / "Config_files" / "transmission" / "config_transmission.json"
 EXPERIMENTS_DIR = ROOT_DIR / "Experiments"
-DATA_PATH = ROOT_DIR / "data" / "preprocessed.csv" # where input data is located
+DATA_PATH = ROOT_DIR / "data" / "preprocessed.csv"
 
 # add project root to sys.path so we can import WellConnectController
 sys.path.append(str(ROOT_DIR))
 
 from src.WellConnectController import WellConnectController
+
+# ───────────────────────────────
+# Helper Functions
+# ───────────────────────────────
+
+def calculate_entropy(weight_dict): # how evenly distributed are the weights? More uniform weight dist -> higher entropy
+    '''pass a dictionary of values, returns the entropy'''
+    weights = list(weight_dict.values())
+    shannon_entropy = entropy(weights, base=2)
+    return shannon_entropy
 
 # ───────────────────────────────
 # Load Config file & Unpack Variables
@@ -35,7 +54,6 @@ def parse_value(v):
 
 # Metadata
 EXPERIMENT_NAME   = cfg["experiment_name"]   
-VARIANT           = cfg["variant"] #deterministic or stochastic
 
 # Independent variables
 BASE_WEIGHTS_LIST = [ #parse fractions if any
@@ -47,19 +65,15 @@ TARGET_ENTROPY_LIST = cfg["target_entropy_list"]
 # Controlled variables
 MAX_DISTANCES = cfg["max_distances"]
 ATTRIBUTES = cfg["attributes"]
-SEEDS = cfg["seeds"]
+SEEDS_GROUP_FORMATION = cfg["seeds_group_formation"]  #list of random seeds for group formation
+SEEDS_TRANSMISSION = cfg["seeds_transmission"]  #list of random seeds for transmission
 GROUP_SIZE = cfg["group_size"]
 NUM_GROUPS = cfg["num_groups"]  #number of groups to form in one cohort
 GROUP_FORMATION = cfg["group_formation"]
-TRAITS_OF_INTEREST = cfg["traits_of_interest"]
 HOMOPHILY_FUNCTION_NAME = cfg["homophily_function"]
-# regression related params
-REGRESSION_TYPE = cfg["regression_type"] # "constrained" or "unconstrained"
-DROP_LAST_VAR = cfg["drop_last_var"] # bool: drop last variable in regression (to prevent collinearity) and reconstruct its weight
-DROP_VAR = cfg["drop_var"] # str: to drop a specific variable and reconstruct its weight (to prevent collinearity)
-NAN_PENALTY = cfg["nan_penalty"]
-ABNORMALITY_PENALTY = cfg["anomaly_penalty"]
 NOISE_STDS = cfg["noise_stds"]
+MODEL_STEPS = cfg["model_steps"]
+MODEL_TYPE = cfg.get("model_type")
 
 
 # ───────────────────────────────
@@ -71,13 +85,10 @@ base_params = {
     'group_size': GROUP_SIZE,
     'num_groups': NUM_GROUPS,
     'group_formation': GROUP_FORMATION,
-    'traits_of_interest': TRAITS_OF_INTEREST,
     'homophily_function': HOMOPHILY_FUNCTION_NAME,
-    'regression_type': REGRESSION_TYPE,
-    'drop_last_var': DROP_LAST_VAR,
-    'drop_var': DROP_VAR,
-    'NaN_penalty': NAN_PENALTY,
-    'Abnormality_penalty': ABNORMALITY_PENALTY,
+    'model_steps': MODEL_STEPS,
+    'model_type': MODEL_TYPE,
+    'seeds_transmission': SEEDS_TRANSMISSION
 }
 
 
@@ -85,8 +96,8 @@ base_params = {
 # Output Folder Structure
 # ───────────────────────────────
 
-# create path like: Experiments/<experiment_name>/<variant>/batch_<timestamp>/
-chapter_dir = EXPERIMENTS_DIR / EXPERIMENT_NAME / VARIANT
+# create path like: Experiments/<experiment_name>/batch_<timestamp>/
+chapter_dir = EXPERIMENTS_DIR / EXPERIMENT_NAME
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 batch_dir = chapter_dir / f"batch_{timestamp}"
 batch_dir.mkdir(parents=True, exist_ok=True)
@@ -100,7 +111,7 @@ shutil.copy2(CONFIG_PATH, batch_dir / "config_used.json")
 # ───────────────────────────────────────────
 
 # loop through each seed
-for seed in SEEDS:
+for seed in SEEDS_GROUP_FORMATION:
 
     print(f"\n=== Running seed {seed} ===")
 
@@ -109,7 +120,7 @@ for seed in SEEDS:
 
     #loop through each set of base weights and entropies
     for target_entropy in TARGET_ENTROPY_LIST:
-        controller = WellConnectController(data_path='data/preprocessed.csv',
+        controller = WellConnectController(data_path=DATA_PATH,
                                             group_size=GROUP_SIZE,
                                             attributes=ATTRIBUTES,
                                             max_distances=MAX_DISTANCES)
@@ -138,21 +149,7 @@ for seed in SEEDS:
                     noise_std=noise_std
                 )
 
-                recovered_weights_df = controller.recover_group_connections(
-                    groups=groups,
-                    weights=base_weights,
-                    drop_last_var=DROP_LAST_VAR,
-                    drop_var=DROP_VAR,
-                    regression_type=REGRESSION_TYPE,
-                )
-
-                measure_dict = controller.statistical_power_analysis(
-                    traits_of_interest=TRAITS_OF_INTEREST, 
-                    recovered_weights_df=recovered_weights_df,
-                    weights=base_weights,
-                    nan_penalty=NAN_PENALTY,
-                    anomaly_penalty=ABNORMALITY_PENALTY
-                )
+                contagion_histories, transition_logs = controller.simulate_depression_dynamics(groups, seeds=SEEDS_TRANSMISSION, steps=MODEL_STEPS, model_type=MODEL_TYPE)
 
                 params = dict(base_params) #copy base params
                 #add run-specific params
@@ -161,14 +158,16 @@ for seed in SEEDS:
                 params['base_weights'] = base_weights
                 params['noise_std'] = noise_std
 
-                run_dir = noise_dir / f"experiment_run_{experiment_count}_target_e_{target_entropy}"
+                weight_entropy = calculate_entropy(base_weights)
+                run_dir = noise_dir / f"experiment_run_{experiment_count}_target_e_{target_entropy}_weight_e_{weight_entropy:.4f}"
                 run_dir.mkdir(exist_ok=True)
 
                 controller.save_experiment_data(groups,
-                                                recovered_weights_df,
                                                 params,
                                                 experiment_folder=run_dir,
-                                                measure_dict=measure_dict)
+                                                contagion_histories=contagion_histories,
+                                                transition_logs=transition_logs
+                                                )
             
 
                 print(f"✔ Run {experiment_count} | seed={seed}, entropy={target_entropy}, "
@@ -178,4 +177,5 @@ for seed in SEEDS:
 
 # NB: the loops are set up such that each experiment_run_{} folder each has a fixed weight but different trait entropies (so multiple pkl files)
 # This is for efficiency so that we can reuse created groups for different noise levels and weights
+
 

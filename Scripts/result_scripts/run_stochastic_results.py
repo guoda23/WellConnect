@@ -1,13 +1,28 @@
 
 # %%
+import sys
+from pathlib import Path
+
+
+def resolve_project_root(start_dir: Path) -> Path:
+    """Walk up from this script until we find the repository root."""
+    for candidate in [start_dir, *start_dir.parents]:
+        if (candidate / "src" / "WellConnectController.py").exists() and (candidate / "Experiments").exists():
+            return candidate
+    raise RuntimeError("Could not locate project root from script location")
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = resolve_project_root(SCRIPT_DIR)
+sys.path.insert(0, str(ROOT_DIR))
 
 from src.modules.OutputGenerator import OutputGenerator
 #constrained reg:
-batch_folder_stochastic = "Experiments/homophily_function_retrievability/stochastic/batch_2025-10-04_00-43-50"
+batch_folder_stochastic = str(ROOT_DIR / "Experiments" / "homophily_function_retrievability" / "stochastic" / "batch_2025-10-04_00-43-50")
 #constrained reg trait entropy 1.761 val:
-# batch_folder_stochastic = "Experiments/homophily_function_retrievability/stochastic/batch_2025-10-06_12-33-43"
+# batch_folder_stochastic = str(ROOT_DIR / "Experiments" / "homophily_function_retrievability" / "stochastic" / "batch_2025-10-06_12-33-43")
 #unconstrained reg:
-# batch_folder_stochastic = "Experiments/homophily_function_retrievability/stochastic/batch_2025-10-04_22-52-24"
+# batch_folder_stochastic = str(ROOT_DIR / "Experiments" / "homophily_function_retrievability" / "stochastic" / "batch_2025-10-04_22-52-24")
 
 # %%
 output_gen = OutputGenerator(batch_folder_stochastic, mode="stochastic")
@@ -25,7 +40,7 @@ for noise_level in [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]:
         output_gen.plot_heatmaps(traits=['Gender_tertiary'], target_entropy=True,
                                 dependent_variable="mean", 
                                 vmax=0.45,
-                                save_path=f"Results/homophily_f_retrievability/stochastic_heatmap_noise_{noise_level}.png",
+                                save_path=str(ROOT_DIR / "Results" / "homophily_f_retrievability" / f"stochastic_heatmap_noise_{noise_level}.png"),
                                 suptitle=False, custom_trait_labels=custom_trait_labels, dpi=300,
                                 export=False)
 
