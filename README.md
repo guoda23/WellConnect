@@ -122,7 +122,6 @@ Each batch includes a copied `config_used.json`, and per-seed/per-run subfolders
 
 - Seeds are controlled through config files (`seeds`, `seeds_group_formation`, `seeds_transmission`).
 - Configs are copied into each batch folder at runtime.
-- Keep a record of the exact script + config combination for each figure reported in manuscripts.
 
 ## Current Scope and Future Adaptation
 
