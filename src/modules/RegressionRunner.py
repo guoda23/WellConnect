@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from regression_methods import REGRESSION_FUNCTIONS
+from src.modules.regression_methods import REGRESSION_FUNCTIONS
 
 
 class RegressionRunner:

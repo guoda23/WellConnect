@@ -22,6 +22,17 @@ from PIL import Image   # Pillow for safe resizing
 from src.modules.Visualizer3DScatterplot import Visualizer3DScatterPlot
 
 
+# Custom unpickler for backward compatibility with old pickled experiment data
+# Old pickles saved entities as 'entities' module, but after refactoring it's now 'src.models.entities'
+# This remapper allows loading old data without migration - new experiments will save with correct paths
+class RemappingUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        # Remap old module paths to new ones
+        if module.startswith('entities'):
+            module = 'src.models.entities'
+        return super().find_class(module, name)
+
+
 class OutputGenerator:
     def __init__(self, batch_folder, mode):
         """
@@ -78,7 +89,7 @@ class OutputGenerator:
                 for run_dir in sdir.glob("experiment_run_*"):
                     for pkl_file in run_dir.glob("*.pkl"):
                         with open(pkl_file, "rb") as f:
-                            experiment_data = pickle.load(f)
+                            experiment_data = RemappingUnpickler(f).load()
                         # deterministic → noise_std = None
                         experiment_data["params"].setdefault("noise_std", None)
                         all_experiments_data[str(pkl_file)] = experiment_data
@@ -100,7 +111,7 @@ class OutputGenerator:
                 for run_dir in noise_dir.glob("experiment_run_*"):
                     for pkl_file in run_dir.glob("*.pkl"):
                         with open(pkl_file, "rb") as f:
-                            experiment_data = pickle.load(f)
+                            experiment_data = RemappingUnpickler(f).load()
                         experiment_data["params"].setdefault("noise_std", noise_val)
                         all_experiments_data[str(pkl_file)] = experiment_data
 
@@ -533,7 +544,7 @@ class OutputGenerator:
         for pkl_file in tqdm(all_pickles, desc="Aggregating experiments"):
             try:
                 with open(pkl_file, "rb") as f:
-                    exp = pickle.load(f)
+                    exp = RemappingUnpickler(f).load()
             except Exception:
                 continue
 

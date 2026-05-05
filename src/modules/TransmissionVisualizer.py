@@ -9,6 +9,17 @@ from PIL import Image, ImageOps
 import re
 
 
+# Custom unpickler for backward compatibility with old pickled experiment data
+# Old pickles saved entities as 'entities' module, but after refactoring it's now 'src.models.entities'
+# This remapper allows loading old data without migration - new experiments will save with correct paths
+class RemappingUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        # Remap old module paths to new ones
+        if module.startswith('entities'):
+            module = 'src.models.entities'
+        return super().find_class(module, name)
+
+
 class TransmissionVisualizer:
     def __init__(self, batch_folder):
         self.batch_folder = Path(batch_folder)
@@ -29,7 +40,7 @@ class TransmissionVisualizer:
                 for run_dir in ndir.glob("experiment_run_*"):
                     for pkl_file in run_dir.glob("*.pkl"):
                         with open(pkl_file, "rb") as f:
-                            exp_data = pickle.load(f)
+                            exp_data = RemappingUnpickler(f).load()
                         all_experiments[str(pkl_file)] = exp_data
 
         self.experiment_data = all_experiments
