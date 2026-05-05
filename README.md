@@ -18,6 +18,7 @@ The current repository is organized around scientific experiments, specifically:
 - Configuration files in `Config_files/`.
 - Generated experiment outputs in `Experiments/`.
 - Generated figures and processed outputs in `Results/`.
+- Synthetic datasets, demographic data, and LLM-generated data in `Synthetic data/` (includes notebooks for statistical analysis).
 
 ## Main Workflows
 
