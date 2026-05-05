@@ -24,7 +24,7 @@ The current repository is organized around scientific experiments, specifically:
 
 ### 1) Homophily Function Retrievability
 
-![WellConnect software framework](software-mode-illustrations/wellconnect-software-framework.png)
+![WellConnect software framework](Illustrations%20-%20software%20modes/Wellconnect%20software%20framework.png)
 
 Goal: test whether original trait weights can be recovered from simulated connection structures.
 
