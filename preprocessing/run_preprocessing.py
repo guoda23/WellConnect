@@ -2,7 +2,7 @@
 import argparse
 import pandas as pd
 
-from categorize import (
+from preprocessing.categorize import (
     categorize_age_binary,
     categorize_age_tertiary,
     categorize_education_binary,

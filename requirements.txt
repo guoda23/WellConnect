@@ -1,0 +1,12 @@
+numpy<2
+pandas
+scipy
+scikit-learn
+networkx
+matplotlib
+seaborn
+tqdm
+pillow
+dash
+plotly
+panel
