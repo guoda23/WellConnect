@@ -24,6 +24,8 @@ The current repository is organized around scientific experiments, specifically:
 
 ### 1) Homophily Function Retrievability
 
+![](Illustrattions%20-%20software%20modes/Wellconnect%20software%20framework.png)
+
 Goal: test whether original trait weights can be recovered from simulated connection structures.
 
 - Deterministic runs:
@@ -129,9 +131,10 @@ Current scope:
 - Research-driven, batch-oriented simulation and analysis.
 - Flexible experimentation over entropy targets, homophily weights, noise levels, and transmission models.
 
-Possible future extension (not implemented here):
+Possible future extension (not isolated here):
 
 - A simplified interface for creating one group interactively and inspecting dynamics without running full experiment batches.
+- Adaptations for the Wellconnect cohort and pilot studies (see the pdf in the Illustrations folder)
 
 ## Citation
 
