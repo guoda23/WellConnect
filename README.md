@@ -48,15 +48,21 @@ Goal: simulate depression dynamics in groups under varying homophily structure, 
 
 ## Setup
 
-This repository does not currently include a pinned environment file (`requirements.txt`, `pyproject.toml`, or `environment.yml`).
+This repository includes a `requirements.txt` file with the Python packages used by the project.
 
-Create and activate a virtual environment, then install dependencies inferred from imports:
+Create and activate a virtual environment:
 
 ```bash
+macOS/Linux:
 python3 -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
-pip install numpy pandas scipy scikit-learn networkx matplotlib seaborn tqdm pillow dash plotly
+
+Windows (PowerShell):
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1
+
+Install dependencies:
+pip install -r requirements.txt
 ```
 
 Notes:
