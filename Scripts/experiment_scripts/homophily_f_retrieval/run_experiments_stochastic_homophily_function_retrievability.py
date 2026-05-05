@@ -172,11 +172,13 @@ for seed in SEEDS:
                 run_dir = noise_dir / f"experiment_run_{experiment_count}_target_e_{target_entropy}"
                 run_dir.mkdir(exist_ok=True)
 
-                controller.save_experiment_data(groups,
-                                                recovered_weights_df,
-                                                params,
-                                                experiment_folder=run_dir,
-                                                measure_dict=measure_dict)
+                controller.save_experiment_data(
+                    groups,
+                    params,
+                    run_dir,
+                    recovered_weights_df=recovered_weights_df,
+                    measure_dict=measure_dict,
+                )
             
 
                 print(f"✔ Run {experiment_count} | seed={seed}, entropy={target_entropy}, "
